@@ -17,8 +17,11 @@ class AgentPromptIn(BaseModel):
     prompt: str
     system_prompt: str | None = None
     model_name: str | None = None
+    llm_api_key: str | None = None
+    llm_base_url: str | None = None
     enabled_tool_ids: list[str] = []
     discord_channel_id: str | None = None
+    history: list[dict] = []
 
 
 class AgentToolCallOut(BaseModel):

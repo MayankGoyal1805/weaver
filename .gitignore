@@ -4,6 +4,7 @@
 !.env.example
 *.log
 .DS_Store
+
 *.db
 *.json
 !pubspec.json
@@ -12,7 +13,6 @@
 !tsconfig.json
 !jsconfig.json
 !deno.json
-uv.lock
 temp.txt
 
 # Python
@@ -25,14 +25,12 @@ temp.txt
 **/.env/
 *.so
 .Python
-build/
+**/build/
 develop-eggs/
 dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
 parts/
 sdist/
 var/
@@ -44,10 +42,10 @@ share/python-wheels/
 MANIFEST
 
 # Environments
-.venv/
-venv/
-ENV/
-env/
+**/.venv/
+**/venv/
+**/ENV/
+**/env/
 # uv
 .uv-cache/
 

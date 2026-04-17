@@ -31,7 +31,13 @@ class OAuthTokenStore:
     def _save(self, payload: dict[str, Any]) -> None:
         self.path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
-    def set_tokens(self, provider: str, token_bundle: dict[str, Any], state: str | None = None) -> dict[str, Any]:
+    def set_tokens(
+        self,
+        provider: str,
+        token_bundle: dict[str, Any],
+        state: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         payload = self._load()
         providers = payload.setdefault("providers", {})
 
@@ -50,6 +56,9 @@ class OAuthTokenStore:
 
         if state:
             record["last_state"] = state
+
+        if metadata:
+            record["metadata"] = metadata
 
         providers[provider] = record
         self._save(payload)
@@ -71,6 +80,7 @@ class OAuthTokenStore:
             "scopes": record.get("scopes", []),
             "expires_at": record.get("expires_at"),
             "updated_at": record.get("updated_at"),
+            "metadata": record.get("metadata", {}),
         }
 
 

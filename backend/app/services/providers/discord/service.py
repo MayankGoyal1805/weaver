@@ -82,6 +82,52 @@ class DiscordIntegrationService:
             "sent": True,
         }
 
+    @staticmethod
+    async def get_user_info(access_token: str) -> dict:
+        headers = {"Authorization": f"Bearer {access_token}"}
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.get(
+                "https://discord.com/api/v10/users/@me",
+                headers=headers,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+        username = data.get("username", "")
+        discriminator = data.get("discriminator", "")
+        if discriminator and discriminator != "0":
+            display = f"{username}#{discriminator}"
+        else:
+            display = username
+
+        return {
+            "id": data.get("id"),
+            "username": username,
+            "display_name": display,
+            "global_name": data.get("global_name"),
+            "email": data.get("email"),
+            "verified": data.get("verified"),
+        }
+
+    @staticmethod
+    async def get_bot_identity(bot_token: str) -> dict:
+        if not bot_token:
+            return {"configured": False}
+
+        headers = {"Authorization": f"Bot {bot_token}"}
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.get("https://discord.com/api/v10/users/@me", headers=headers)
+            response.raise_for_status()
+            data = response.json()
+
+        return {
+            "configured": True,
+            "id": data.get("id"),
+            "username": data.get("username"),
+            "global_name": data.get("global_name"),
+            "bot": data.get("bot", True),
+        }
+
 
 def _format_discord_error(response: httpx.Response, channel_id: str) -> str:
     status = response.status_code

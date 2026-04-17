@@ -20,6 +20,15 @@ class FilesystemToolService:
             raise FileSandboxError("Path escapes allowed file root")
         return candidate
 
+    def set_allowed_root(self, root_path: str) -> dict:
+        candidate = Path(root_path).expanduser().resolve()
+        candidate.mkdir(parents=True, exist_ok=True)
+        self.allowed_root = candidate
+        return {"allowed_root": str(self.allowed_root)}
+
+    def get_allowed_root(self) -> dict:
+        return {"allowed_root": str(self.allowed_root)}
+
     def list_directory(self, path: str = ".") -> dict:
         directory = self._resolve(path)
         if not directory.exists() or not directory.is_dir():

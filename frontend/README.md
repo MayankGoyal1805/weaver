@@ -1,17 +1,46 @@
-# weaver_app
+# Weaver Frontend
 
-A new Flutter project.
+Flutter desktop UI for Weaver with live backend integration.
 
-## Getting Started
+## What Is Integrated
 
-This project is a starting point for a Flutter application.
+- Backend auto-start from the app (Linux desktop flow)
+- Live tool catalog and tool auth status from backend
+- OAuth connect flow for Google and Discord from UI buttons
+- Tool-aware agent prompt route (`/api/v1/chat/agent`)
+- Prompt flows for Gmail, Drive, Discord, and filesystem tools
+- Configurable backend base URL and default Discord channel in Settings
 
-A few resources to get you started if this is your first Flutter project:
+## Run
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+From this folder:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+1. `flutter pub get`
+2. `flutter run -d linux`
+
+By default, the app tries to start backend at `http://127.0.0.1:8000`.
+You can change this from Settings -> Backend Runtime.
+
+## Auth Flow
+
+From UI:
+
+1. Open Settings -> Auth & Tools
+2. Click Connect for Google (used by both Gmail and Drive)
+3. Complete browser OAuth callback
+4. Click Connect for Discord if needed
+5. Save a Discord channel id in Settings -> Agent Defaults
+
+## Prompt Testing
+
+Use chat prompts such as:
+
+- `fetch the latest gmail`
+- `list drive files`
+- `fetch the latest gmail and send to discord`
+- `list files in sandbox`
+
+## Notes
+
+- n8n integration is intentionally deferred.
+- Workflows panel still uses starter data and is not yet backend-driven.

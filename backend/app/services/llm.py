@@ -10,13 +10,21 @@ class LLMConfigError(Exception):
 
 
 class LLMService:
-    async def chat(self, prompt: str, system_prompt: str | None = None, model_name: str | None = None) -> dict:
+    async def chat(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        model_name: str | None = None,
+        llm_api_key: str | None = None,
+        llm_base_url: str | None = None,
+        history: list[dict] | None = None,
+    ) -> dict:
         settings = get_settings()
-        api_key = settings.llm_api_key.strip()
+        api_key = (llm_api_key or settings.llm_api_key).strip()
         if not api_key:
             raise LLMConfigError("LLM_API_KEY is missing")
 
-        base_url = settings.llm_base_url.strip()
+        base_url = (llm_base_url or settings.llm_base_url).strip()
         if not base_url:
             raise LLMConfigError("LLM_BASE_URL is missing")
 
@@ -30,6 +38,14 @@ class LLMService:
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
+        for item in history or []:
+            role = item.get("role", "user")
+            content = item.get("content", "")
+            if not content:
+                continue
+            if role not in {"user", "assistant", "system"}:
+                continue
+            messages.append({"role": role, "content": content})
         messages.append({"role": "user", "content": prompt})
 
         payload = {

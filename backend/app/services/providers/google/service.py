@@ -154,6 +154,24 @@ class GoogleIntegrationService:
             "body_text": body_text,
         }
 
+    @staticmethod
+    async def get_user_info(access_token: str) -> dict:
+        headers = {"Authorization": f"Bearer {access_token}"}
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.get(
+                "https://www.googleapis.com/oauth2/v2/userinfo",
+                headers=headers,
+            )
+            response.raise_for_status()
+            data = response.json()
+        return {
+            "id": data.get("id"),
+            "email": data.get("email"),
+            "name": data.get("name"),
+            "picture": data.get("picture"),
+            "verified_email": data.get("verified_email"),
+        }
+
 
 def _extract_message_body(payload: dict) -> str:
     plain_text = _find_plain_text(payload)

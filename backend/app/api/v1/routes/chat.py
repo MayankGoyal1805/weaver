@@ -30,9 +30,31 @@ async def agent_prompt(payload: AgentPromptIn) -> AgentPromptOut:
     enabled = set(payload.enabled_tool_ids)
     prompt_lower = payload.prompt.lower()
 
-    wants_latest_gmail = any(x in prompt_lower for x in ["latest gmail", "latest email", "last gmail", "last email"])
-    wants_drive_files = any(x in prompt_lower for x in ["drive files", "google drive", "list drive"])
-    wants_discord = "discord" in prompt_lower or "channel" in prompt_lower
+    wants_latest_gmail = any(
+        x in prompt_lower
+        for x in [
+            "latest gmail",
+            "latest email",
+            "last gmail",
+            "last email",
+            "newest email",
+            "check gmail",
+            "read gmail",
+            "inbox",
+        ]
+    )
+    wants_drive_files = any(
+        x in prompt_lower
+        for x in [
+            "drive files",
+            "google drive",
+            "list drive",
+            "drive folder",
+            "show drive",
+            "browse drive",
+        ]
+    )
+    wants_discord = any(x in prompt_lower for x in ["discord", "channel", "send to discord", "post to discord"])
 
     tool_calls: list[AgentToolCallOut] = []
     latest_email: dict | None = None
@@ -77,6 +99,9 @@ async def agent_prompt(payload: AgentPromptIn) -> AgentPromptOut:
             prompt=llm_prompt,
             system_prompt=llm_system_prompt,
             model_name=payload.model_name,
+            llm_api_key=payload.llm_api_key,
+            llm_base_url=payload.llm_base_url,
+            history=payload.history,
         )
         chat_out = ChatOut(**out)
     except LLMConfigError as exc:

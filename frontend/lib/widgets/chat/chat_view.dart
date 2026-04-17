@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../providers/providers.dart';
 import '../../theme/colors.dart';
 import '../../models/models.dart';
-import '../common/common_widgets.dart';
 import '../common/animated_widgets.dart';
 
 class ChatView extends StatelessWidget {
@@ -106,7 +105,12 @@ class _ChatHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(session.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: WeaverColors.textPrimary)),
-              Text(session.agentName, style: const TextStyle(fontSize: 11, color: WeaverColors.textMuted)),
+              Consumer<ModelProvider>(
+                builder: (_, modelProv, __) => Text(
+                  '${session.agentName} • ${modelProv.modelName}',
+                  style: const TextStyle(fontSize: 11, color: WeaverColors.textMuted),
+                ),
+              ),
             ],
           ),
           const Spacer(),
@@ -148,7 +152,6 @@ class _ToolChipStrip extends StatelessWidget {
         final session = chatProv.activeSession;
         if (session == null) return const SizedBox.shrink();
         final enabledTools = toolsProv.tools.where((t) => session.enabledToolIds.contains(t.id)).toList();
-        final allTools = toolsProv.tools;
 
         return Container(
           height: 42,
@@ -658,7 +661,7 @@ class _ChatInputState extends State<_ChatInput> {
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            modelProv.selectedModel.name,
+                            modelProv.modelName,
                             style: const TextStyle(fontSize: 11, color: WeaverColors.textMuted, fontWeight: FontWeight.w500),
                           ),
                         ),

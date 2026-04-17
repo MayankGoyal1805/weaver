@@ -187,6 +187,17 @@ class _ToolCardBody extends StatelessWidget {
 
           // Auth status bar
           _AuthStatusBar(tool: tool, provider: provider),
+          if (_connectedAccount(tool).isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Connected as: ${_connectedAccount(tool)}',
+              style: const TextStyle(fontSize: 11, color: WeaverColors.textMuted),
+            ),
+          ],
+          if (tool.id == 'filesystem') ...[
+            const SizedBox(height: 10),
+            _FilesystemRootEditor(tool: tool, provider: provider),
+          ],
           const SizedBox(height: 14),
 
           // Capabilities
@@ -209,6 +220,93 @@ class _ToolCardBody extends StatelessWidget {
               ],
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  String _connectedAccount(ToolModel tool) {
+    final metadata = tool.metadata;
+    final profile = metadata['profile'] as Map<String, dynamic>?;
+    if (profile == null) return '';
+    if (tool.id == 'discord') {
+      return profile['display_name']?.toString() ?? profile['username']?.toString() ?? '';
+    }
+    return profile['email']?.toString() ?? profile['name']?.toString() ?? '';
+  }
+}
+
+class _FilesystemRootEditor extends StatefulWidget {
+  final ToolModel tool;
+  final ToolsProvider provider;
+
+  const _FilesystemRootEditor({required this.tool, required this.provider});
+
+  @override
+  State<_FilesystemRootEditor> createState() => _FilesystemRootEditorState();
+}
+
+class _FilesystemRootEditorState extends State<_FilesystemRootEditor> {
+  late final TextEditingController _rootController;
+
+  @override
+  void initState() {
+    super.initState();
+    _rootController = TextEditingController(
+      text: widget.tool.metadata['allowed_root']?.toString() ?? '',
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _FilesystemRootEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final root = widget.tool.metadata['allowed_root']?.toString() ?? '';
+    if (root.isNotEmpty && _rootController.text != root) {
+      _rootController.text = root;
+    }
+  }
+
+  @override
+  void dispose() {
+    _rootController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: WeaverColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: WeaverColors.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Allowed Root Directory',
+            style: TextStyle(fontSize: 11, color: WeaverColors.textMuted, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _rootController,
+            style: const TextStyle(fontSize: 12, color: WeaverColors.textPrimary),
+            decoration: const InputDecoration(
+              hintText: '/home/user/projects/allowed-dir',
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 28,
+            child: ElevatedButton.icon(
+              onPressed: () => widget.provider.setFilesystemRoot(_rootController.text),
+              icon: const Icon(Icons.save_rounded, size: 13),
+              label: const Text('Save Root', style: TextStyle(fontSize: 11)),
+              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10)),
+            ),
+          ),
         ],
       ),
     );

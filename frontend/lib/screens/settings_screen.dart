@@ -15,6 +15,9 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _baseUrlController = TextEditingController();
   final TextEditingController _discordChannelController = TextEditingController();
+  final TextEditingController _llmApiKeyController = TextEditingController();
+  final TextEditingController _llmBaseUrlController = TextEditingController();
+  bool _obscureApiKey = true;
 
   @override
   void didChangeDependencies() {
@@ -22,12 +25,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final backend = context.read<BackendProvider>();
     _baseUrlController.text = backend.baseUrl;
     _discordChannelController.text = backend.discordChannelId;
+    _llmApiKeyController.text = backend.llmApiKey;
+    _llmBaseUrlController.text = backend.llmBaseUrl;
   }
 
   @override
   void dispose() {
     _baseUrlController.dispose();
     _discordChannelController.dispose();
+    _llmApiKeyController.dispose();
+    _llmBaseUrlController.dispose();
     super.dispose();
   }
 
@@ -112,8 +119,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 20),
               _Section(
-                title: 'Auth & Tools',
+                title: 'LLM Credentials',
                 icon: Icons.key_rounded,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _LabeledField(
+                      label: 'LLM Base URL',
+                      controller: _llmBaseUrlController,
+                      hint: 'https://api.openai.com/v1',
+                    ),
+                    const SizedBox(height: 8),
+                    _LabeledField(
+                      label: 'LLM API Key',
+                      controller: _llmApiKeyController,
+                      hint: 'sk-...',
+                      obscureText: _obscureApiKey,
+                      trailing: IconButton(
+                        icon: Icon(_obscureApiKey ? Icons.visibility_rounded : Icons.visibility_off_rounded),
+                        onPressed: () => setState(() => _obscureApiKey = !_obscureApiKey),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ElevatedButton.icon(
+                      onPressed: () async {
+                        await backend.setLlmBaseUrl(_llmBaseUrlController.text);
+                        await backend.setLlmApiKey(_llmApiKeyController.text);
+                      },
+                      icon: const Icon(Icons.save_rounded, size: 14),
+                      label: const Text('Save LLM Credentials'),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Model name is configured from the right sidebar model panel.',
+                      style: TextStyle(fontSize: 12, color: WeaverColors.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              _Section(
+                title: 'Auth & Tools',
+                icon: Icons.verified_user_rounded,
                 child: Column(
                   children: [
                     _AuthRow(
@@ -128,10 +175,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onConnect: () => tools.connectTool('discord'),
                     ),
                     const SizedBox(height: 10),
+                    _UserInfoTile(
+                      title: 'Google account',
+                      info: backend.googleUserInfo,
+                      primary: (backend.googleUserInfo['profile'] as Map<String, dynamic>? ?? const {})['email']?.toString(),
+                      secondary: (backend.googleUserInfo['profile'] as Map<String, dynamic>? ?? const {})['name']?.toString(),
+                    ),
+                    const SizedBox(height: 8),
+                    _UserInfoTile(
+                      title: 'Discord account',
+                      info: backend.discordUserInfo,
+                      primary: (backend.discordUserInfo['profile'] as Map<String, dynamic>? ?? const {})['display_name']?.toString(),
+                      secondary: (backend.discordUserInfo['profile'] as Map<String, dynamic>? ?? const {})['email']?.toString(),
+                    ),
+                    const SizedBox(height: 8),
+                    _BotInfoTile(status: backend.discordBotStatus),
+                    const SizedBox(height: 10),
                     Row(
                       children: [
                         OutlinedButton.icon(
-                          onPressed: () => tools.refreshFromBackend(),
+                          onPressed: () async {
+                            await tools.refreshFromBackend();
+                            await backend.refreshUserInfo();
+                            await backend.refreshDiscordBotStatus();
+                          },
                           icon: const Icon(Icons.refresh_rounded, size: 14),
                           label: const Text('Refresh Tool Status'),
                         ),
@@ -239,8 +306,16 @@ class _LabeledField extends StatelessWidget {
   final String label;
   final TextEditingController controller;
   final String hint;
+  final bool obscureText;
+  final Widget? trailing;
 
-  const _LabeledField({required this.label, required this.controller, required this.hint});
+  const _LabeledField({
+    required this.label,
+    required this.controller,
+    required this.hint,
+    this.obscureText = false,
+    this.trailing,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -251,10 +326,89 @@ class _LabeledField extends StatelessWidget {
         const SizedBox(height: 5),
         TextField(
           controller: controller,
+          obscureText: obscureText,
           style: const TextStyle(fontSize: 12, color: WeaverColors.textPrimary),
-          decoration: InputDecoration(hintText: hint, isDense: true),
+          decoration: InputDecoration(hintText: hint, isDense: true, suffixIcon: trailing),
         ),
       ],
+    );
+  }
+}
+
+class _UserInfoTile extends StatelessWidget {
+  final String title;
+  final Map<String, dynamic> info;
+  final String? primary;
+  final String? secondary;
+
+  const _UserInfoTile({
+    required this.title,
+    required this.info,
+    required this.primary,
+    required this.secondary,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final authenticated = info['authenticated'] == true;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: WeaverColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: WeaverColors.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontSize: 12, color: WeaverColors.textPrimary, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 2),
+          Text(
+            authenticated
+                ? (primary == null || primary!.isEmpty ? 'Authenticated' : primary!)
+                : 'Not authenticated',
+            style: TextStyle(fontSize: 12, color: authenticated ? WeaverColors.success : WeaverColors.textMuted),
+          ),
+          if (secondary != null && secondary!.isNotEmpty)
+            Text(secondary!, style: const TextStyle(fontSize: 11, color: WeaverColors.textMuted)),
+        ],
+      ),
+    );
+  }
+}
+
+class _BotInfoTile extends StatelessWidget {
+  final Map<String, dynamic> status;
+
+  const _BotInfoTile({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final configured = status['configured'] == true;
+    final username = status['username']?.toString() ?? '';
+    final error = status['error']?.toString() ?? '';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: WeaverColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: WeaverColors.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Discord bot token status', style: TextStyle(fontSize: 12, color: WeaverColors.textPrimary, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 2),
+          Text(
+            configured ? 'Configured${username.isNotEmpty ? ': $username' : ''}' : 'Not configured',
+            style: TextStyle(fontSize: 12, color: configured ? WeaverColors.success : WeaverColors.warning),
+          ),
+          if (error.isNotEmpty)
+            Text(error, style: const TextStyle(fontSize: 11, color: WeaverColors.error)),
+        ],
+      ),
     );
   }
 }

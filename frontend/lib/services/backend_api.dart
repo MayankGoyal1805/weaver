@@ -136,6 +136,10 @@ class BackendPreferences {
   static const _keyFilesystemRoot = 'backend.filesystemRoot';
   static const _keyChatSessions = 'chat.sessions.v1';
   static const _keyChatActiveSession = 'chat.activeSession.v1';
+  static const _keyModelName = 'model.name';
+  static const _keySystemPrompt = 'model.systemPrompt';
+  static const _keyTemperature = 'model.temperature';
+  static const _keyMaxTokens = 'model.maxTokens';
 
   Future<String> loadBaseUrl() async {
     final prefs = await SharedPreferences.getInstance();
@@ -219,6 +223,47 @@ class BackendPreferences {
       return;
     }
     await prefs.setString(_keyChatActiveSession, value);
+  }
+
+  Future<String> loadModelName() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyModelName) ?? 'gpt-4.1-mini';
+  }
+
+  Future<void> saveModelName(String value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyModelName, value);
+  }
+
+  Future<String> loadSystemPrompt() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keySystemPrompt) ??
+        'You are Weaver, an intelligent multi-agent assistant. You have access to a rich set of tools and can help with automation, file management, communication, and research. Be concise, precise, and proactive.';
+  }
+
+  Future<void> saveSystemPrompt(String value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keySystemPrompt, value);
+  }
+
+  Future<double> loadTemperature() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getDouble(_keyTemperature) ?? 0.7;
+  }
+
+  Future<void> saveTemperature(double value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_keyTemperature, value);
+  }
+
+  Future<int> loadMaxTokens() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_keyMaxTokens) ?? 4096;
+  }
+
+  Future<void> saveMaxTokens(int value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_keyMaxTokens, value);
   }
 }
 

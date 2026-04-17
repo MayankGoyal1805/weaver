@@ -13,16 +13,16 @@ class WeaverApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AppState()),
         ChangeNotifierProvider(create: (_) => BackendProvider()..initialize()),
+        ChangeNotifierProvider(create: (_) => ModelProvider()..initialize()),
         ChangeNotifierProxyProvider<BackendProvider, ToolsProvider>(
           create: (_) => ToolsProvider(),
           update: (_, backend, tools) => tools!..bindBackend(backend),
         ),
-        ChangeNotifierProxyProvider2<BackendProvider, ToolsProvider, ChatProvider>(
+        ChangeNotifierProxyProvider3<BackendProvider, ToolsProvider, ModelProvider, ChatProvider>(
           create: (_) => ChatProvider(),
-          update: (_, backend, tools, chat) => chat!..bind(backend, tools),
+          update: (_, backend, tools, model, chat) => chat!..bind(backend, tools, model),
         ),
         ChangeNotifierProvider(create: (_) => WorkflowsProvider()),
-        ChangeNotifierProvider(create: (_) => ModelProvider()),
       ],
       child: MaterialApp(
         title: 'Weaver',

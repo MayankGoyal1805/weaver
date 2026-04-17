@@ -279,6 +279,8 @@ class BackendProvider extends ChangeNotifier {
 
 // ── Chat Provider ─────────────────────────────────────────────────────────────
 class ChatProvider extends ChangeNotifier {
+  final BackendPreferences _prefs = BackendPreferences();
+
   List<ChatSession> _sessions = [];
   List<ChatSession> get sessions => _sessions;
 
@@ -297,15 +299,19 @@ class ChatProvider extends ChangeNotifier {
 
   BackendProvider? _backend;
   ToolsProvider? _toolsProvider;
+  ModelProvider? _modelProvider;
+  bool _didHydrate = false;
 
   final TextEditingController inputController = TextEditingController();
   bool _isTyping = false;
   bool get isTyping => _isTyping;
 
-  void bind(BackendProvider backend, ToolsProvider toolsProvider) {
+  void bind(BackendProvider backend, ToolsProvider toolsProvider, ModelProvider modelProvider) {
     _backend = backend;
     _toolsProvider = toolsProvider;
-    if (_sessions.isEmpty) {
+    _modelProvider = modelProvider;
+    _hydrateIfNeeded();
+    if (_sessions.isEmpty && !_didHydrate) {
       final initial = ChatSession(
         id: 'chat-${DateTime.now().millisecondsSinceEpoch}',
         title: 'New conversation',
@@ -325,6 +331,7 @@ class ChatProvider extends ChangeNotifier {
     }
     _activeSessionId = sessionId;
     _activeTabId = sessionId;
+    _persistState();
     notifyListeners();
   }
 
@@ -334,12 +341,14 @@ class ChatProvider extends ChangeNotifier {
       _activeTabId = _openTabIds.isNotEmpty ? _openTabIds.last : null;
       _activeSessionId = _activeTabId;
     }
+    _persistState();
     notifyListeners();
   }
 
   void setActiveTab(String sessionId) {
     _activeTabId = sessionId;
     _activeSessionId = sessionId;
+    _persistState();
     notifyListeners();
   }
 
@@ -374,7 +383,8 @@ class ChatProvider extends ChangeNotifier {
     try {
       final backend = _backend;
       final toolsProvider = _toolsProvider;
-      if (backend == null || toolsProvider == null) {
+      final modelProvider = _modelProvider;
+      if (backend == null || toolsProvider == null || modelProvider == null) {
         throw Exception('Backend integration is not initialized.');
       }
 
@@ -386,7 +396,12 @@ class ChatProvider extends ChangeNotifier {
       final out = await backend.sendAgentPrompt(
         prompt: content.trim(),
         enabledToolIds: activeTools,
+        modelName: modelProvider.modelName,
+        systemPrompt: modelProvider.systemPrompt,
         discordChannelId: backend.discordChannelId.isEmpty ? null : backend.discordChannelId,
+        llmApiKey: backend.llmApiKey.isEmpty ? null : backend.llmApiKey,
+        llmBaseUrl: backend.llmBaseUrl,
+        history: _historyForBackend(_sessions[idx].messages),
       );
 
       final toolCalls = (out['tool_calls'] as List<dynamic>? ?? const []).cast<Map<String, dynamic>>();
@@ -425,6 +440,7 @@ class ChatProvider extends ChangeNotifier {
         timestamp: DateTime.now(),
       );
       _appendMessage(idx, assistantMsg);
+      _refreshSessionTitle(idx);
     } catch (exc) {
       final assistantMsg = ChatMessage(
         id: 'a-${DateTime.now().millisecondsSinceEpoch}',
@@ -435,6 +451,7 @@ class ChatProvider extends ChangeNotifier {
       _appendMessage(idx, assistantMsg);
     } finally {
       _isTyping = false;
+      _persistState();
       notifyListeners();
     }
   }
@@ -451,6 +468,7 @@ class ChatProvider extends ChangeNotifier {
     );
     _sessions.insert(0, session);
     openSession(id);
+    _persistState();
     notifyListeners();
   }
 
@@ -471,6 +489,176 @@ class ChatProvider extends ChangeNotifier {
       enabledToolIds: _sessions[idx].enabledToolIds,
       isPinned: _sessions[idx].isPinned,
       workflowCount: _sessions[idx].workflowCount,
+    );
+    _persistState();
+  }
+
+  List<Map<String, String>> _historyForBackend(List<ChatMessage> messages) {
+    final out = <Map<String, String>>[];
+    for (final msg in messages) {
+      if (msg.content.trim().isEmpty) {
+        continue;
+      }
+      final role = switch (msg.role) {
+        MessageRole.user => 'user',
+        MessageRole.assistant => 'assistant',
+        MessageRole.system => 'system',
+        MessageRole.tool => 'assistant',
+      };
+      out.add({'role': role, 'content': msg.content});
+    }
+    if (out.length > 20) {
+      return out.sublist(out.length - 20);
+    }
+    return out;
+  }
+
+  void _refreshSessionTitle(int idx) {
+    final session = _sessions[idx];
+    if (session.title != 'New conversation') {
+      return;
+    }
+    final firstUser = session.messages.where((m) => m.role == MessageRole.user).firstOrNull;
+    if (firstUser == null) {
+      return;
+    }
+    final cleaned = firstUser.content.trim().replaceAll('\n', ' ');
+    if (cleaned.isEmpty) {
+      return;
+    }
+    final title = cleaned.length > 48 ? '${cleaned.substring(0, 48)}...' : cleaned;
+    _sessions[idx] = ChatSession(
+      id: session.id,
+      title: title,
+      agentName: session.agentName,
+      updatedAt: session.updatedAt,
+      messages: session.messages,
+      enabledToolIds: session.enabledToolIds,
+      isPinned: session.isPinned,
+      workflowCount: session.workflowCount,
+    );
+  }
+
+  Future<void> _hydrateIfNeeded() async {
+    if (_didHydrate) {
+      return;
+    }
+    _didHydrate = true;
+    final raw = await _prefs.loadChatSessionsJson();
+    if (raw.isEmpty) {
+      if (_sessions.isEmpty) {
+        final initial = ChatSession(
+          id: 'chat-${DateTime.now().millisecondsSinceEpoch}',
+          title: 'New conversation',
+          agentName: 'Weaver Agent',
+          updatedAt: DateTime.now(),
+          messages: const [],
+          enabledToolIds: const ['gmail', 'google-drive', 'discord', 'filesystem'],
+        );
+        _sessions = [initial];
+        _activeSessionId = initial.id;
+        _activeTabId = initial.id;
+        _openTabIds
+          ..clear()
+          ..add(initial.id);
+        notifyListeners();
+      }
+      return;
+    }
+
+    try {
+      final parsed = jsonDecode(raw) as List<dynamic>;
+      _sessions = parsed.map((e) => _sessionFromJson(e as Map<String, dynamic>)).toList();
+      final savedActive = await _prefs.loadActiveChatSessionId();
+      if (_sessions.isNotEmpty) {
+        final active = _sessions.any((s) => s.id == savedActive) ? savedActive : _sessions.first.id;
+        _activeSessionId = active;
+        _activeTabId = active;
+        _openTabIds
+          ..clear()
+          ..add(active!);
+      }
+      notifyListeners();
+    } catch (_) {
+      _sessions = [];
+    }
+  }
+
+  void _persistState() {
+    final jsonList = jsonEncode(_sessions.map(_sessionToJson).toList(growable: false));
+    _prefs.saveChatSessionsJson(jsonList);
+    _prefs.saveActiveChatSessionId(_activeSessionId);
+  }
+
+  Map<String, dynamic> _sessionToJson(ChatSession session) {
+    return {
+      'id': session.id,
+      'title': session.title,
+      'agentName': session.agentName,
+      'updatedAt': session.updatedAt.toIso8601String(),
+      'enabledToolIds': session.enabledToolIds,
+      'isPinned': session.isPinned,
+      'workflowCount': session.workflowCount,
+      'messages': session.messages.map(_messageToJson).toList(growable: false),
+    };
+  }
+
+  ChatSession _sessionFromJson(Map<String, dynamic> data) {
+    return ChatSession(
+      id: data['id']?.toString() ?? 'chat-${DateTime.now().millisecondsSinceEpoch}',
+      title: data['title']?.toString() ?? 'New conversation',
+      agentName: data['agentName']?.toString() ?? 'Weaver Agent',
+      updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
+      messages: ((data['messages'] as List<dynamic>? ?? const [])
+          .map((e) => _messageFromJson(e as Map<String, dynamic>))
+          .toList()),
+      enabledToolIds: ((data['enabledToolIds'] as List<dynamic>? ?? const ['gmail', 'google-drive', 'discord', 'filesystem'])
+          .map((e) => e.toString())
+          .toList()),
+      isPinned: data['isPinned'] == true,
+      workflowCount: (data['workflowCount'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  Map<String, dynamic> _messageToJson(ChatMessage msg) {
+    return {
+      'id': msg.id,
+      'role': msg.role.name,
+      'content': msg.content,
+      'timestamp': msg.timestamp.toIso8601String(),
+      'toolCall': msg.toolCall == null
+          ? null
+          : {
+              'toolName': msg.toolCall!.toolName,
+              'arguments': msg.toolCall!.arguments,
+              'result': msg.toolCall!.result,
+              'success': msg.toolCall!.success,
+            },
+    };
+  }
+
+  ChatMessage _messageFromJson(Map<String, dynamic> data) {
+    final toolCallRaw = data['toolCall'];
+    ToolCallResult? toolCall;
+    if (toolCallRaw is Map<String, dynamic>) {
+      toolCall = ToolCallResult(
+        toolName: toolCallRaw['toolName']?.toString() ?? 'tool',
+        arguments: (toolCallRaw['arguments'] as Map<String, dynamic>? ?? const {}),
+        result: toolCallRaw['result']?.toString() ?? '',
+        success: toolCallRaw['success'] == true,
+      );
+    }
+    final roleName = data['role']?.toString() ?? 'assistant';
+    final role = MessageRole.values.firstWhere(
+      (e) => e.name == roleName,
+      orElse: () => MessageRole.assistant,
+    );
+    return ChatMessage(
+      id: data['id']?.toString() ?? 'm-${DateTime.now().millisecondsSinceEpoch}',
+      role: role,
+      content: data['content']?.toString() ?? '',
+      timestamp: DateTime.tryParse(data['timestamp']?.toString() ?? '') ?? DateTime.now(),
+      toolCall: toolCall,
     );
   }
 }
@@ -494,6 +682,10 @@ class ToolsProvider extends ChangeNotifier {
   bool get isLoading => _loading;
   String? _lastError;
   String? get lastError => _lastError;
+  final Map<String, Map<String, dynamic>> _cardMetadataByProvider = {};
+
+  Map<String, dynamic> metadataForProvider(String provider) =>
+      _cardMetadataByProvider[provider] ?? const {};
 
   void bindBackend(BackendProvider backend) {
     _backend = backend;
@@ -555,6 +747,8 @@ class ToolsProvider extends ChangeNotifier {
         await Future<void>.delayed(const Duration(seconds: 1));
         final status = await backend.fetchAuthStatus(provider);
         if (status['authenticated'] == true) {
+          await backend.refreshUserInfo();
+          await refreshFromBackend();
           _applyProviderAuth(provider, AuthStatus.connected);
           notifyListeners();
           return;
@@ -582,6 +776,15 @@ class ToolsProvider extends ChangeNotifier {
       await backend.ensureBackendRunning();
       final catalog = await backend.fetchToolCatalog();
       final cards = await backend.fetchToolStates();
+      _cardMetadataByProvider
+        ..clear()
+        ..addEntries(cards.map((card) => MapEntry(
+              card['provider']?.toString() ?? '',
+              (card['metadata'] as Map<String, dynamic>? ?? const {}),
+            )));
+      await backend.refreshFilesystemRoot();
+      await backend.refreshUserInfo();
+      await backend.refreshDiscordBotStatus();
       _tools = _buildTools(catalog, cards, previous: _tools);
     } catch (exc) {
       _lastError = '$exc';
@@ -640,6 +843,7 @@ class ToolsProvider extends ChangeNotifier {
         usageCount: 0,
         lastUsed: null,
         categoryColor: const Color(0xFF42A5F5),
+        metadata: _cardMetadataByProvider['google'] ?? const {},
       ),
       ToolModel(
         id: 'google-drive',
@@ -653,6 +857,7 @@ class ToolsProvider extends ChangeNotifier {
         usageCount: 0,
         lastUsed: null,
         categoryColor: const Color(0xFF42A5F5),
+        metadata: _cardMetadataByProvider['google'] ?? const {},
       ),
       ToolModel(
         id: 'discord',
@@ -666,6 +871,7 @@ class ToolsProvider extends ChangeNotifier {
         usageCount: 0,
         lastUsed: null,
         categoryColor: const Color(0xFF8B5CF6),
+        metadata: _cardMetadataByProvider['discord'] ?? const {},
       ),
       ToolModel(
         id: 'filesystem',
@@ -679,8 +885,16 @@ class ToolsProvider extends ChangeNotifier {
         usageCount: 0,
         lastUsed: null,
         categoryColor: const Color(0xFF22C55E),
+        metadata: _cardMetadataByProvider['filesystem'] ?? const {},
       ),
     ];
+  }
+
+  Future<void> setFilesystemRoot(String rootPath) async {
+    final backend = _backend;
+    if (backend == null) return;
+    await backend.setFilesystemRoot(rootPath);
+    await refreshFromBackend();
   }
 
   AuthStatus _mapAuthStatus(String status) {
@@ -842,14 +1056,11 @@ class WorkflowsProvider extends ChangeNotifier {
 
 // ── Model Provider ────────────────────────────────────────────────────────────
 class ModelProvider extends ChangeNotifier {
-  List<LlmModel> _models = List.from(MockData.llmModels);
-  List<LlmModel> get models => _models;
+  final BackendPreferences _prefs = BackendPreferences();
+  bool _didLoad = false;
 
-  String _selectedModelId = 'gemini-2.5-pro';
-  String get selectedModelId => _selectedModelId;
-
-  LlmModel get selectedModel =>
-      _models.firstWhere((m) => m.id == _selectedModelId);
+  String _modelName = 'gpt-4.1-mini';
+  String get modelName => _modelName;
 
   String _systemPrompt =
       'You are Weaver, an intelligent multi-agent assistant. You have access to a rich set of tools and can help with automation, file management, communication, and research. Be concise, precise, and proactive.';
@@ -861,23 +1072,39 @@ class ModelProvider extends ChangeNotifier {
   int _maxTokens = 4096;
   int get maxTokens => _maxTokens;
 
-  void selectModel(String id) {
-    _selectedModelId = id;
+  Future<void> initialize() async {
+    if (_didLoad) return;
+    _didLoad = true;
+    _modelName = await _prefs.loadModelName();
+    _systemPrompt = await _prefs.loadSystemPrompt();
+    _temperature = await _prefs.loadTemperature();
+    _maxTokens = await _prefs.loadMaxTokens();
     notifyListeners();
   }
 
-  void setSystemPrompt(String p) {
+  Future<void> setModelName(String value) async {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return;
+    _modelName = trimmed;
+    await _prefs.saveModelName(_modelName);
+    notifyListeners();
+  }
+
+  Future<void> setSystemPrompt(String p) async {
     _systemPrompt = p;
+    await _prefs.saveSystemPrompt(_systemPrompt);
     notifyListeners();
   }
 
-  void setTemperature(double t) {
+  Future<void> setTemperature(double t) async {
     _temperature = t;
+    await _prefs.saveTemperature(_temperature);
     notifyListeners();
   }
 
-  void setMaxTokens(int t) {
+  Future<void> setMaxTokens(int t) async {
     _maxTokens = t;
+    await _prefs.saveMaxTokens(_maxTokens);
     notifyListeners();
   }
 }

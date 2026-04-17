@@ -19,6 +19,7 @@ dependencies:
   # HTTP / networking
   http: ^1.6.0
   web_socket_channel: ^3.0.3
+  url_launcher: ^6.3.1
 
   # UI extras
   flutter_animate: ^4.5.2

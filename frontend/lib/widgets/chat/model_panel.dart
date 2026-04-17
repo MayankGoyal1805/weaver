@@ -48,7 +48,8 @@ class _ModelPanelState extends State<ModelPanel> {
             TextField(
               controller: _modelNameController,
               decoration: const InputDecoration(
-                hintText: 'Enter model name (e.g. gpt-4.1-mini, openrouter/model)',
+                hintText:
+                    'Enter model name (e.g. gpt-4.1-mini, openrouter/model)',
                 isDense: true,
               ),
               onSubmitted: modelProv.setModelName,
@@ -57,18 +58,19 @@ class _ModelPanelState extends State<ModelPanel> {
             SizedBox(
               height: 30,
               child: ElevatedButton(
-                onPressed: () => modelProv.setModelName(_modelNameController.text),
+                onPressed: () =>
+                    modelProv.setModelName(_modelNameController.text),
                 child: const Text('Save Model Name'),
               ),
             ),
             const SizedBox(height: 18),
-
             _SectionLabel('System Prompt'),
             const SizedBox(height: 8),
             TextField(
               maxLines: 6,
               controller: _systemPromptController,
-              style: const TextStyle(fontSize: 12, color: WeaverColors.textSecondary, height: 1.5),
+              style: const TextStyle(
+                  fontSize: 12, color: WeaverColors.textSecondary, height: 1.5),
               decoration: const InputDecoration(
                 hintText: 'Enter system prompt...',
                 isDense: true,
@@ -76,7 +78,6 @@ class _ModelPanelState extends State<ModelPanel> {
               onChanged: modelProv.setSystemPrompt,
             ),
             const SizedBox(height: 16),
-
             _SliderRow(
               label: 'Temperature',
               value: modelProv.temperature,
@@ -171,7 +172,11 @@ class _SliderRow extends StatelessWidget {
             ),
           ],
         ),
-        Slider(value: value.clamp(min, max), min: min, max: max, onChanged: onChanged),
+        Slider(
+            value: value.clamp(min, max),
+            min: min,
+            max: max,
+            onChanged: onChanged),
       ],
     );
   }

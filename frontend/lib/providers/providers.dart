@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 import '../services/backend_api.dart';
 import '../models/models.dart';
 import '../data/mock_data.dart';
@@ -132,7 +133,8 @@ class BackendProvider extends ChangeNotifier {
     final trimmed = value.trim();
     if (trimmed.isEmpty) return;
     await ensureBackendRunning();
-    final out = await _api.postJson('/api/v1/tools/filesystem/root', {'allowed_root': trimmed});
+    final out = await _api
+        .postJson('/api/v1/tools/filesystem/root', {'allowed_root': trimmed});
     _filesystemRoot = out['allowed_root']?.toString() ?? trimmed;
     await _prefs.saveFilesystemRoot(_filesystemRoot);
     notifyListeners();
@@ -264,7 +266,8 @@ class BackendProvider extends ChangeNotifier {
       return;
     }
     try {
-      await _api.postJson('/api/v1/tools/filesystem/root', {'allowed_root': _filesystemRoot});
+      await _api.postJson(
+          '/api/v1/tools/filesystem/root', {'allowed_root': _filesystemRoot});
     } catch (_) {
       await refreshFilesystemRoot();
     }
@@ -280,6 +283,7 @@ class BackendProvider extends ChangeNotifier {
 // ── Chat Provider ─────────────────────────────────────────────────────────────
 class ChatProvider extends ChangeNotifier {
   final BackendPreferences _prefs = BackendPreferences();
+  final Uuid _uuid = const Uuid();
 
   List<ChatSession> _sessions = [];
   List<ChatSession> get sessions => _sessions;
@@ -305,21 +309,19 @@ class ChatProvider extends ChangeNotifier {
   final TextEditingController inputController = TextEditingController();
   bool _isTyping = false;
   bool get isTyping => _isTyping;
+  String? _typingSessionId;
 
-  void bind(BackendProvider backend, ToolsProvider toolsProvider, ModelProvider modelProvider) {
+  bool isTypingFor(String sessionId) =>
+      _isTyping && _typingSessionId == sessionId;
+
+  void bind(BackendProvider backend, ToolsProvider toolsProvider,
+      ModelProvider modelProvider) {
     _backend = backend;
     _toolsProvider = toolsProvider;
     _modelProvider = modelProvider;
     _hydrateIfNeeded();
     if (_sessions.isEmpty && !_didHydrate) {
-      final initial = ChatSession(
-        id: 'chat-${DateTime.now().millisecondsSinceEpoch}',
-        title: 'New conversation',
-        agentName: 'Weaver Agent',
-        updatedAt: DateTime.now(),
-        messages: const [],
-        enabledToolIds: const ['gmail', 'google-drive', 'discord', 'filesystem'],
-      );
+      final initial = _newSession();
       _sessions = [initial];
       openSession(initial.id);
     }
@@ -354,18 +356,20 @@ class ChatProvider extends ChangeNotifier {
 
   Future<void> sendMessage(String content) async {
     if (content.trim().isEmpty || _activeSessionId == null) return;
-    final idx = _sessions.indexWhere((s) => s.id == _activeSessionId);
+    final sessionId = _activeSessionId!;
+    final idx = _sessionIndex(sessionId);
     if (idx == -1) return;
 
     final userMsg = ChatMessage(
-      id: 'u-${DateTime.now().millisecondsSinceEpoch}',
+      id: _newMessageId('u'),
       role: MessageRole.user,
       content: content.trim(),
       timestamp: DateTime.now(),
     );
 
     // Add user message
-    final updated = List<ChatMessage>.from(_sessions[idx].messages)..add(userMsg);
+    final updated = List<ChatMessage>.from(_sessions[idx].messages)
+      ..add(userMsg);
     _sessions[idx] = ChatSession(
       id: _sessions[idx].id,
       title: _sessions[idx].title,
@@ -378,6 +382,7 @@ class ChatProvider extends ChangeNotifier {
     );
     inputController.clear();
     _isTyping = true;
+    _typingSessionId = sessionId;
     notifyListeners();
 
     try {
@@ -398,20 +403,23 @@ class ChatProvider extends ChangeNotifier {
         enabledToolIds: activeTools,
         modelName: modelProvider.modelName,
         systemPrompt: modelProvider.systemPrompt,
-        discordChannelId: backend.discordChannelId.isEmpty ? null : backend.discordChannelId,
+        discordChannelId:
+            backend.discordChannelId.isEmpty ? null : backend.discordChannelId,
         llmApiKey: backend.llmApiKey.isEmpty ? null : backend.llmApiKey,
         llmBaseUrl: backend.llmBaseUrl,
-        history: _historyForBackend(_sessions[idx].messages),
+        history: _historyForBackend(_messagesForSession(sessionId)),
       );
 
-      final toolCalls = (out['tool_calls'] as List<dynamic>? ?? const []).cast<Map<String, dynamic>>();
+      final toolCalls = (out['tool_calls'] as List<dynamic>? ?? const [])
+          .cast<Map<String, dynamic>>();
       for (final toolCall in toolCalls) {
-        final result = (toolCall['result'] as Map<String, dynamic>? ?? const {});
+        final result =
+            (toolCall['result'] as Map<String, dynamic>? ?? const {});
         final status = result['status']?.toString() ?? 'unknown';
         final summary = result['result']?.toString() ?? status;
 
         final toolMsg = ChatMessage(
-          id: 't-${DateTime.now().millisecondsSinceEpoch}-${toolCall['tool_id']}',
+          id: _newMessageId('t'),
           role: MessageRole.assistant,
           content: '',
           timestamp: DateTime.now(),
@@ -422,52 +430,48 @@ class ChatProvider extends ChangeNotifier {
             success: status == 'ok',
           ),
         );
-        _appendMessage(idx, toolMsg);
+        _appendMessageBySession(sessionId, toolMsg);
       }
 
       final chat = (out['chat'] as Map<String, dynamic>? ?? const {});
       final chatError = out['chat_error']?.toString();
-      final assistantContent = (chat['content']?.toString().trim().isNotEmpty ?? false)
-          ? chat['content'].toString()
-          : (chatError != null && chatError.isNotEmpty
-              ? 'Agent note: $chatError'
-              : 'Request completed.');
+      final assistantContent =
+          (chat['content']?.toString().trim().isNotEmpty ?? false)
+              ? chat['content'].toString()
+              : (chatError != null && chatError.isNotEmpty
+                  ? 'Agent note: $chatError'
+                  : 'Request completed.');
 
       final assistantMsg = ChatMessage(
-        id: 'a-${DateTime.now().millisecondsSinceEpoch}',
+        id: _newMessageId('a'),
         role: MessageRole.assistant,
         content: assistantContent,
         timestamp: DateTime.now(),
       );
-      _appendMessage(idx, assistantMsg);
-      _refreshSessionTitle(idx);
+      _appendMessageBySession(sessionId, assistantMsg);
+      _refreshSessionTitleById(sessionId);
     } catch (exc) {
       final assistantMsg = ChatMessage(
-        id: 'a-${DateTime.now().millisecondsSinceEpoch}',
+        id: _newMessageId('a'),
         role: MessageRole.assistant,
         content: 'Failed to process request: $exc',
         timestamp: DateTime.now(),
       );
-      _appendMessage(idx, assistantMsg);
+      _appendMessageBySession(sessionId, assistantMsg);
     } finally {
-      _isTyping = false;
+      if (_typingSessionId == sessionId) {
+        _isTyping = false;
+        _typingSessionId = null;
+      }
       _persistState();
       notifyListeners();
     }
   }
 
   void newChat() {
-    final id = 'chat-new-${DateTime.now().millisecondsSinceEpoch}';
-    final session = ChatSession(
-      id: id,
-      title: 'New conversation',
-      agentName: 'Weaver Agent',
-      updatedAt: DateTime.now(),
-      messages: [],
-      enabledToolIds: const ['gmail', 'google-drive', 'discord', 'filesystem'],
-    );
+    final session = _newSession();
     _sessions.insert(0, session);
-    openSession(id);
+    openSession(session.id);
     _persistState();
     notifyListeners();
   }
@@ -478,8 +482,13 @@ class ChatProvider extends ChangeNotifier {
     super.dispose();
   }
 
-  void _appendMessage(int idx, ChatMessage message) {
-    final updated = List<ChatMessage>.from(_sessions[idx].messages)..add(message);
+  void _appendMessageBySession(String sessionId, ChatMessage message) {
+    final idx = _sessionIndex(sessionId);
+    if (idx == -1) {
+      return;
+    }
+    final updated = List<ChatMessage>.from(_sessions[idx].messages)
+      ..add(message);
     _sessions[idx] = ChatSession(
       id: _sessions[idx].id,
       title: _sessions[idx].title,
@@ -491,6 +500,18 @@ class ChatProvider extends ChangeNotifier {
       workflowCount: _sessions[idx].workflowCount,
     );
     _persistState();
+  }
+
+  int _sessionIndex(String sessionId) {
+    return _sessions.indexWhere((s) => s.id == sessionId);
+  }
+
+  List<ChatMessage> _messagesForSession(String sessionId) {
+    final idx = _sessionIndex(sessionId);
+    if (idx == -1) {
+      return const [];
+    }
+    return _sessions[idx].messages;
   }
 
   List<Map<String, String>> _historyForBackend(List<ChatMessage> messages) {
@@ -513,12 +534,17 @@ class ChatProvider extends ChangeNotifier {
     return out;
   }
 
-  void _refreshSessionTitle(int idx) {
+  void _refreshSessionTitleById(String sessionId) {
+    final idx = _sessionIndex(sessionId);
+    if (idx == -1) {
+      return;
+    }
     final session = _sessions[idx];
     if (session.title != 'New conversation') {
       return;
     }
-    final firstUser = session.messages.where((m) => m.role == MessageRole.user).firstOrNull;
+    final firstUser =
+        session.messages.where((m) => m.role == MessageRole.user).firstOrNull;
     if (firstUser == null) {
       return;
     }
@@ -526,7 +552,8 @@ class ChatProvider extends ChangeNotifier {
     if (cleaned.isEmpty) {
       return;
     }
-    final title = cleaned.length > 48 ? '${cleaned.substring(0, 48)}...' : cleaned;
+    final title =
+        cleaned.length > 48 ? '${cleaned.substring(0, 48)}...' : cleaned;
     _sessions[idx] = ChatSession(
       id: session.id,
       title: title,
@@ -547,14 +574,7 @@ class ChatProvider extends ChangeNotifier {
     final raw = await _prefs.loadChatSessionsJson();
     if (raw.isEmpty) {
       if (_sessions.isEmpty) {
-        final initial = ChatSession(
-          id: 'chat-${DateTime.now().millisecondsSinceEpoch}',
-          title: 'New conversation',
-          agentName: 'Weaver Agent',
-          updatedAt: DateTime.now(),
-          messages: const [],
-          enabledToolIds: const ['gmail', 'google-drive', 'discord', 'filesystem'],
-        );
+        final initial = _newSession();
         _sessions = [initial];
         _activeSessionId = initial.id;
         _activeTabId = initial.id;
@@ -568,24 +588,45 @@ class ChatProvider extends ChangeNotifier {
 
     try {
       final parsed = jsonDecode(raw) as List<dynamic>;
-      _sessions = parsed.map((e) => _sessionFromJson(e as Map<String, dynamic>)).toList();
-      final savedActive = await _prefs.loadActiveChatSessionId();
-      if (_sessions.isNotEmpty) {
-        final active = _sessions.any((s) => s.id == savedActive) ? savedActive : _sessions.first.id;
-        _activeSessionId = active;
-        _activeTabId = active;
-        _openTabIds
-          ..clear()
-          ..add(active!);
+      _sessions = _normalizeSessions(
+        parsed
+          .map((e) => _sessionFromJson(e as Map<String, dynamic>))
+          .toList(),
+      );
+
+      if (_sessions.isEmpty) {
+        final initial = _newSession();
+        _sessions = [initial];
       }
+
+      final savedActive = await _prefs.loadActiveChatSessionId();
+      final active = _sessions.any((s) => s.id == savedActive)
+          ? savedActive
+          : _sessions.first.id;
+      _activeSessionId = active;
+      _activeTabId = active;
+      _openTabIds
+        ..clear()
+        ..add(active!);
+
+      _persistState();
       notifyListeners();
     } catch (_) {
-      _sessions = [];
+      final initial = _newSession();
+      _sessions = [initial];
+      _activeSessionId = initial.id;
+      _activeTabId = initial.id;
+      _openTabIds
+        ..clear()
+        ..add(initial.id);
+      _persistState();
+      notifyListeners();
     }
   }
 
   void _persistState() {
-    final jsonList = jsonEncode(_sessions.map(_sessionToJson).toList(growable: false));
+    final jsonList =
+        jsonEncode(_sessions.map(_sessionToJson).toList(growable: false));
     _prefs.saveChatSessionsJson(jsonList);
     _prefs.saveActiveChatSessionId(_activeSessionId);
   }
@@ -605,14 +646,16 @@ class ChatProvider extends ChangeNotifier {
 
   ChatSession _sessionFromJson(Map<String, dynamic> data) {
     return ChatSession(
-      id: data['id']?.toString() ?? 'chat-${DateTime.now().millisecondsSinceEpoch}',
+      id: data['id']?.toString() ?? _newSessionId(),
       title: data['title']?.toString() ?? 'New conversation',
       agentName: data['agentName']?.toString() ?? 'Weaver Agent',
-      updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
+      updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? '') ??
+          DateTime.now(),
       messages: ((data['messages'] as List<dynamic>? ?? const [])
           .map((e) => _messageFromJson(e as Map<String, dynamic>))
           .toList()),
-      enabledToolIds: ((data['enabledToolIds'] as List<dynamic>? ?? const ['gmail', 'google-drive', 'discord', 'filesystem'])
+      enabledToolIds: ((data['enabledToolIds'] as List<dynamic>? ??
+              const ['gmail', 'google-drive', 'discord', 'filesystem'])
           .map((e) => e.toString())
           .toList()),
       isPinned: data['isPinned'] == true,
@@ -643,7 +686,8 @@ class ChatProvider extends ChangeNotifier {
     if (toolCallRaw is Map<String, dynamic>) {
       toolCall = ToolCallResult(
         toolName: toolCallRaw['toolName']?.toString() ?? 'tool',
-        arguments: (toolCallRaw['arguments'] as Map<String, dynamic>? ?? const {}),
+        arguments:
+            (toolCallRaw['arguments'] as Map<String, dynamic>? ?? const {}),
         result: toolCallRaw['result']?.toString() ?? '',
         success: toolCallRaw['success'] == true,
       );
@@ -654,12 +698,49 @@ class ChatProvider extends ChangeNotifier {
       orElse: () => MessageRole.assistant,
     );
     return ChatMessage(
-      id: data['id']?.toString() ?? 'm-${DateTime.now().millisecondsSinceEpoch}',
+      id: data['id']?.toString() ?? _newMessageId('m'),
       role: role,
       content: data['content']?.toString() ?? '',
-      timestamp: DateTime.tryParse(data['timestamp']?.toString() ?? '') ?? DateTime.now(),
+      timestamp: DateTime.tryParse(data['timestamp']?.toString() ?? '') ??
+          DateTime.now(),
       toolCall: toolCall,
     );
+  }
+
+  ChatSession _newSession() {
+    return ChatSession(
+      id: _newSessionId(),
+      title: 'New conversation',
+      agentName: 'Weaver Agent',
+      updatedAt: DateTime.now(),
+      messages: const [],
+      enabledToolIds: const ['gmail', 'google-drive', 'discord', 'filesystem'],
+    );
+  }
+
+  String _newSessionId() => 'chat-${_uuid.v4()}';
+
+  String _newMessageId(String prefix) => '$prefix-${_uuid.v4()}';
+
+  List<ChatSession> _normalizeSessions(List<ChatSession> input) {
+    final seenIds = <String>{};
+    final normalized = <ChatSession>[];
+    for (final session in input) {
+      final needsNewId = session.id.trim().isEmpty || seenIds.contains(session.id);
+      final id = needsNewId ? _newSessionId() : session.id;
+      seenIds.add(id);
+      normalized.add(ChatSession(
+        id: id,
+        title: session.title,
+        agentName: session.agentName,
+        updatedAt: session.updatedAt,
+        messages: session.messages,
+        enabledToolIds: session.enabledToolIds,
+        isPinned: session.isPinned,
+        workflowCount: session.workflowCount,
+      ));
+    }
+    return normalized;
   }
 }
 
@@ -762,7 +843,8 @@ class ToolsProvider extends ChangeNotifier {
     }
   }
 
-  int get connectedCount => _tools.where((t) => t.authStatus == AuthStatus.connected).length;
+  int get connectedCount =>
+      _tools.where((t) => t.authStatus == AuthStatus.connected).length;
   int get enabledCount => _tools.where((t) => t.isEnabled).length;
 
   Future<void> refreshFromBackend() async {
@@ -799,7 +881,8 @@ class ToolsProvider extends ChangeNotifier {
 
   void _applyProviderAuth(String provider, AuthStatus status) {
     for (final tool in _tools) {
-      final belongs = (provider == 'google' && (tool.id == 'gmail' || tool.id == 'google-drive')) ||
+      final belongs = (provider == 'google' &&
+              (tool.id == 'gmail' || tool.id == 'google-drive')) ||
           (provider == 'discord' && tool.id == 'discord');
       if (!belongs) continue;
       tool.authStatus = status;
@@ -816,14 +899,20 @@ class ToolsProvider extends ChangeNotifier {
   }) {
     final previousEnabled = {for (final t in previous) t.id: t.isEnabled};
     final statusByProvider = <String, AuthStatus>{
-      for (final card in cards) card['provider'].toString(): _mapAuthStatus(card['status']?.toString() ?? ''),
+      for (final card in cards)
+        card['provider'].toString():
+            _mapAuthStatus(card['status']?.toString() ?? ''),
     };
 
     List<ToolCapability> capsForPrefix(String prefix) {
-      final matching = catalog.where((e) => (e['tool_id']?.toString() ?? '').startsWith(prefix)).toList();
+      final matching = catalog
+          .where((e) => (e['tool_id']?.toString() ?? '').startsWith(prefix))
+          .toList();
       return matching
           .map((e) => ToolCapability(
-                name: e['display_name']?.toString() ?? e['tool_id']?.toString() ?? 'Capability',
+                name: e['display_name']?.toString() ??
+                    e['tool_id']?.toString() ??
+                    'Capability',
                 description: e['description']?.toString() ?? '',
                 icon: '•',
               ))
@@ -848,7 +937,8 @@ class ToolsProvider extends ChangeNotifier {
       ToolModel(
         id: 'google-drive',
         name: 'Google Drive',
-        description: 'Browse Drive files and metadata from your connected account.',
+        description:
+            'Browse Drive files and metadata from your connected account.',
         logoEmoji: '🗂️',
         category: ToolCategory.cloud,
         authStatus: statusByProvider['google'] ?? AuthStatus.disconnected,
@@ -862,7 +952,8 @@ class ToolsProvider extends ChangeNotifier {
       ToolModel(
         id: 'discord',
         name: 'Discord',
-        description: 'Send messages to configured channels using your bot token.',
+        description:
+            'Send messages to configured channels using your bot token.',
         logoEmoji: '🎮',
         category: ToolCategory.messaging,
         authStatus: statusByProvider['discord'] ?? AuthStatus.disconnected,
@@ -1016,31 +1107,35 @@ class WorkflowsProvider extends ChangeNotifier {
 
   void createWorkflow(String name, String chatSessionId) {
     final id = 'wf-new-${DateTime.now().millisecondsSinceEpoch}';
-    _workflows.insert(0, WorkflowModel(
-      id: id,
-      name: name,
-      description: 'New workflow',
-      chatSessionId: chatSessionId,
-      status: WorkflowStatus.draft,
-      createdAt: DateTime.now(),
-      runCount: 0,
-      nodes: [
-        WorkflowNode(
-          id: 'start-trigger',
-          label: 'Start',
-          type: NodeType.trigger,
-          toolId: 'manual',
-          toolName: 'Manual',
-          icon: '▶️',
-          position: const Offset(80, 160),
-          config: {},
-          color: const Color(0xFF7B61FF),
-          ports: const [WorkflowPort(id: 'out-1', label: 'start', isInput: false)],
-        ),
-      ],
-      edges: const [],
-      isActive: false,
-    ));
+    _workflows.insert(
+        0,
+        WorkflowModel(
+          id: id,
+          name: name,
+          description: 'New workflow',
+          chatSessionId: chatSessionId,
+          status: WorkflowStatus.draft,
+          createdAt: DateTime.now(),
+          runCount: 0,
+          nodes: [
+            WorkflowNode(
+              id: 'start-trigger',
+              label: 'Start',
+              type: NodeType.trigger,
+              toolId: 'manual',
+              toolName: 'Manual',
+              icon: '▶️',
+              position: const Offset(80, 160),
+              config: {},
+              color: const Color(0xFF7B61FF),
+              ports: const [
+                WorkflowPort(id: 'out-1', label: 'start', isInput: false)
+              ],
+            ),
+          ],
+          edges: const [],
+          isActive: false,
+        ));
     _openWorkflowId = id;
     _showCreateDialog = false;
     notifyListeners();

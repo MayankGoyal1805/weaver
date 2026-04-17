@@ -64,6 +64,49 @@ async def google_userinfo() -> dict:
     status = oauth_token_store.get_status("google")
     metadata = status.get("metadata", {}) if isinstance(status, dict) else {}
     profile = metadata.get("profile", {}) if isinstance(metadata, dict) else {}
+    if status.get("authenticated") and not profile:
+        tokens = oauth_token_store.get_tokens("google")
+        access_token = tokens.get("access_token", "")
+        if access_token:
+            try:
+                profile = await google_service.get_user_info(access_token)
+                oauth_token_store.set_tokens(
+                    "google",
+                    tokens,
+                    metadata={"profile": profile},
+                )
+            except Exception:
+                profile = {}
+            if not profile:
+                try:
+                    profile = await google_service.get_gmail_profile(access_token)
+                    oauth_token_store.set_tokens(
+                        "google",
+                        tokens,
+                        metadata={"profile": profile},
+                    )
+                except Exception:
+                    profile = {}
+        if not profile:
+            refresh_token = tokens.get("refresh_token", "")
+            if refresh_token:
+                try:
+                    refreshed = await google_service.refresh_access_token(refresh_token)
+                    merged = {**tokens, **refreshed}
+                    oauth_token_store.set_tokens(
+                        "google",
+                        merged,
+                        metadata=metadata if isinstance(metadata, dict) else None,
+                    )
+                    fresh_access = merged.get("access_token", "")
+                    if fresh_access:
+                        try:
+                            profile = await google_service.get_user_info(fresh_access)
+                        except Exception:
+                            profile = await google_service.get_gmail_profile(fresh_access)
+                        oauth_token_store.set_tokens("google", merged, metadata={"profile": profile})
+                except Exception:
+                    profile = {}
     return {
         "provider": "google",
         "authenticated": status.get("authenticated", False),
@@ -112,6 +155,19 @@ async def discord_userinfo() -> dict:
     status = oauth_token_store.get_status("discord")
     metadata = status.get("metadata", {}) if isinstance(status, dict) else {}
     profile = metadata.get("profile", {}) if isinstance(metadata, dict) else {}
+    if status.get("authenticated") and not profile:
+        tokens = oauth_token_store.get_tokens("discord")
+        access_token = tokens.get("access_token", "")
+        if access_token:
+            try:
+                profile = await discord_service.get_user_info(access_token)
+                oauth_token_store.set_tokens(
+                    "discord",
+                    tokens,
+                    metadata={"profile": profile},
+                )
+            except Exception:
+                profile = {}
     return {
         "provider": "discord",
         "authenticated": status.get("authenticated", False),

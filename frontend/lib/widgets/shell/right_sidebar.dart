@@ -60,11 +60,26 @@ class _RightSidebarTabBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _TabButton(label: 'Tools', icon: Icons.extension_rounded, index: 0, current: appState.rightPanelTab, onTap: () => appState.setRightPanelTab(0)),
+          _TabButton(
+              label: 'Tools',
+              icon: Icons.extension_rounded,
+              index: 0,
+              current: appState.rightPanelTab,
+              onTap: () => appState.setRightPanelTab(0)),
           const SizedBox(width: 4),
-          _TabButton(label: 'Workflows', icon: Icons.account_tree_rounded, index: 1, current: appState.rightPanelTab, onTap: () => appState.setRightPanelTab(1)),
+          _TabButton(
+              label: 'Workflows',
+              icon: Icons.account_tree_rounded,
+              index: 1,
+              current: appState.rightPanelTab,
+              onTap: () => appState.setRightPanelTab(1)),
           const SizedBox(width: 4),
-          _TabButton(label: 'Model', icon: Icons.psychology_rounded, index: 2, current: appState.rightPanelTab, onTap: () => appState.setRightPanelTab(2)),
+          _TabButton(
+              label: 'Model',
+              icon: Icons.psychology_rounded,
+              index: 2,
+              current: appState.rightPanelTab,
+              onTap: () => appState.setRightPanelTab(2)),
           const Spacer(),
           IconButton(
             onPressed: appState.toggleRightSidebar,
@@ -87,7 +102,12 @@ class _TabButton extends StatefulWidget {
   final int current;
   final VoidCallback onTap;
 
-  const _TabButton({required this.label, required this.icon, required this.index, required this.current, required this.onTap});
+  const _TabButton(
+      {required this.label,
+      required this.icon,
+      required this.index,
+      required this.current,
+      required this.onTap});
 
   @override
   State<_TabButton> createState() => _TabButtonState();
@@ -109,21 +129,29 @@ class _TabButtonState extends State<_TabButton> {
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: selected ? WeaverColors.accentGlow : (_hovered ? WeaverColors.cardHover : Colors.transparent),
+            color: selected
+                ? WeaverColors.accentGlow
+                : (_hovered ? WeaverColors.cardHover : Colors.transparent),
             borderRadius: BorderRadius.circular(6),
-            border: selected ? Border.all(color: WeaverColors.accent.withOpacity(0.4)) : null,
+            border: selected
+                ? Border.all(color: WeaverColors.accent.withOpacity(0.4))
+                : null,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(widget.icon, size: 13, color: selected ? WeaverColors.accent : WeaverColors.textMuted),
+              Icon(widget.icon,
+                  size: 13,
+                  color:
+                      selected ? WeaverColors.accent : WeaverColors.textMuted),
               const SizedBox(width: 5),
               Text(
                 widget.label,
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                  color: selected ? WeaverColors.accent : WeaverColors.textMuted,
+                  color:
+                      selected ? WeaverColors.accent : WeaverColors.textMuted,
                 ),
               ),
             ],
@@ -153,7 +181,8 @@ class _ToolsPanel extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
               child: Column(
                 children: [
-                  if (provider.lastError != null && provider.lastError!.isNotEmpty)
+                  if (provider.lastError != null &&
+                      provider.lastError!.isNotEmpty)
                     Container(
                       width: double.infinity,
                       margin: const EdgeInsets.only(bottom: 8),
@@ -161,16 +190,19 @@ class _ToolsPanel extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: WeaverColors.errorDim,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: WeaverColors.error.withOpacity(0.3)),
+                        border: Border.all(
+                            color: WeaverColors.error.withOpacity(0.3)),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.error_outline_rounded, size: 14, color: WeaverColors.error),
+                          const Icon(Icons.error_outline_rounded,
+                              size: 14, color: WeaverColors.error),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               provider.lastError!,
-                              style: const TextStyle(fontSize: 11, color: WeaverColors.error),
+                              style: const TextStyle(
+                                  fontSize: 11, color: WeaverColors.error),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -178,7 +210,8 @@ class _ToolsPanel extends StatelessWidget {
                           const SizedBox(width: 6),
                           GestureDetector(
                             onTap: provider.refreshFromBackend,
-                            child: const Icon(Icons.refresh_rounded, size: 14, color: WeaverColors.error),
+                            child: const Icon(Icons.refresh_rounded,
+                                size: 14, color: WeaverColors.error),
                           ),
                         ],
                       ),
@@ -186,15 +219,21 @@ class _ToolsPanel extends StatelessWidget {
                   // stats
                   Row(
                     children: [
-                      _StatPill(label: '${provider.connectedCount} connected', color: WeaverColors.success),
+                      _StatPill(
+                          label: '${provider.connectedCount} connected',
+                          color: WeaverColors.success),
                       const SizedBox(width: 6),
-                      _StatPill(label: '${provider.enabledCount} active', color: WeaverColors.accent),
+                      _StatPill(
+                          label: '${provider.enabledCount} active',
+                          color: WeaverColors.accent),
                       const Spacer(),
                       IconButton(
                         tooltip: 'Refresh tools',
                         onPressed: provider.refreshFromBackend,
                         icon: const Icon(Icons.refresh_rounded, size: 16),
-                        style: IconButton.styleFrom(minimumSize: const Size(24, 24), padding: EdgeInsets.zero),
+                        style: IconButton.styleFrom(
+                            minimumSize: const Size(24, 24),
+                            padding: EdgeInsets.zero),
                       ),
                     ],
                   ),
@@ -223,27 +262,30 @@ class _ToolsPanel extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         ...ToolCategory.values.map((c) => Padding(
-                          padding: const EdgeInsets.only(right: 4),
-                          child: CategoryChip(
-                            label: _catLabel(c),
-                            isSelected: provider.filterCategory == c,
-                            onTap: () => provider.setCategory(provider.filterCategory == c ? null : c),
-                            color: _catColor(c),
-                          ),
-                        )),
+                              padding: const EdgeInsets.only(right: 4),
+                              child: CategoryChip(
+                                label: _catLabel(c),
+                                isSelected: provider.filterCategory == c,
+                                onTap: () => provider.setCategory(
+                                    provider.filterCategory == c ? null : c),
+                                color: _catColor(c),
+                              ),
+                            )),
                       ],
                     ),
                   ),
                 ],
               ),
             ),
-            Container(height: 1, color: WeaverColors.cardBorder.withOpacity(0.4)),
+            Container(
+                height: 1, color: WeaverColors.cardBorder.withOpacity(0.4)),
             // Tool list
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.all(12),
                 itemCount: provider.filteredTools.length,
-                itemBuilder: (context, i) => ToolCard(tool: provider.filteredTools[i]),
+                itemBuilder: (context, i) =>
+                    ToolCard(tool: provider.filteredTools[i]),
               ),
             ),
           ],
@@ -286,7 +328,9 @@ class _StatPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withOpacity(0.3)),
       ),
-      child: Text(label, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w500)),
+      child: Text(label,
+          style: TextStyle(
+              fontSize: 11, color: color, fontWeight: FontWeight.w500)),
     );
   }
 }

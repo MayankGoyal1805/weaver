@@ -18,9 +18,11 @@ class WeaverApp extends StatelessWidget {
           create: (_) => ToolsProvider(),
           update: (_, backend, tools) => tools!..bindBackend(backend),
         ),
-        ChangeNotifierProxyProvider3<BackendProvider, ToolsProvider, ModelProvider, ChatProvider>(
+        ChangeNotifierProxyProvider3<BackendProvider, ToolsProvider,
+            ModelProvider, ChatProvider>(
           create: (_) => ChatProvider(),
-          update: (_, backend, tools, model, chat) => chat!..bind(backend, tools, model),
+          update: (_, backend, tools, model, chat) =>
+              chat!..bind(backend, tools, model),
         ),
         ChangeNotifierProvider(create: (_) => WorkflowsProvider()),
       ],

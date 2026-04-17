@@ -5,7 +5,6 @@ import '../../models/models.dart';
 import '../../providers/providers.dart';
 import '../../theme/colors.dart';
 import '../common/common_widgets.dart';
-import '../common/animated_widgets.dart';
 
 class ToolCard extends StatelessWidget {
   final ToolModel tool;
@@ -25,13 +24,16 @@ class ToolCard extends StatelessWidget {
             color: isExpanded ? WeaverColors.cardHover : WeaverColors.card,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isExpanded ? tool.categoryColor.withOpacity(0.5) : WeaverColors.cardBorder,
+              color: isExpanded
+                  ? tool.categoryColor.withOpacity(0.5)
+                  : WeaverColors.cardBorder,
               width: isExpanded ? 1.5 : 1,
             ),
           ),
           child: Column(
             children: [
-              _ToolCardHeader(tool: tool, isExpanded: isExpanded, provider: provider),
+              _ToolCardHeader(
+                  tool: tool, isExpanded: isExpanded, provider: provider),
               if (isExpanded)
                 _ToolCardBody(tool: tool, provider: provider)
                     .animate()
@@ -50,7 +52,8 @@ class _ToolCardHeader extends StatefulWidget {
   final bool isExpanded;
   final ToolsProvider provider;
 
-  const _ToolCardHeader({required this.tool, required this.isExpanded, required this.provider});
+  const _ToolCardHeader(
+      {required this.tool, required this.isExpanded, required this.provider});
 
   @override
   State<_ToolCardHeader> createState() => _ToolCardHeaderState();
@@ -71,7 +74,9 @@ class _ToolCardHeaderState extends State<_ToolCardHeader> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: _hovered && !widget.isExpanded ? WeaverColors.cardHover : Colors.transparent,
+            color: _hovered && !widget.isExpanded
+                ? WeaverColors.cardHover
+                : Colors.transparent,
             borderRadius: widget.isExpanded
                 ? const BorderRadius.vertical(top: Radius.circular(12))
                 : BorderRadius.circular(12),
@@ -85,9 +90,12 @@ class _ToolCardHeaderState extends State<_ToolCardHeader> {
                 decoration: BoxDecoration(
                   color: tool.categoryColor.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(9),
-                  border: Border.all(color: tool.categoryColor.withOpacity(0.25)),
+                  border:
+                      Border.all(color: tool.categoryColor.withOpacity(0.25)),
                 ),
-                child: Center(child: Text(tool.logoEmoji, style: const TextStyle(fontSize: 18))),
+                child: Center(
+                    child: Text(tool.logoEmoji,
+                        style: const TextStyle(fontSize: 18))),
               ),
               const SizedBox(width: 11),
               // Name + status
@@ -112,7 +120,10 @@ class _ToolCardHeaderState extends State<_ToolCardHeader> {
                     const SizedBox(height: 2),
                     Text(
                       _categoryLabel(tool.category),
-                      style: TextStyle(fontSize: 11, color: tool.categoryColor, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: tool.categoryColor,
+                          fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
@@ -120,14 +131,18 @@ class _ToolCardHeaderState extends State<_ToolCardHeader> {
               // Usage count
               if (tool.usageCount > 0) ...[
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                   decoration: BoxDecoration(
                     color: WeaverColors.surface,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     '${tool.usageCount}',
-                    style: const TextStyle(fontSize: 10, color: WeaverColors.textMuted, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                        fontSize: 10,
+                        color: WeaverColors.textMuted,
+                        fontWeight: FontWeight.w600),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -146,7 +161,8 @@ class _ToolCardHeaderState extends State<_ToolCardHeader> {
               AnimatedRotation(
                 turns: widget.isExpanded ? 0.5 : 0,
                 duration: const Duration(milliseconds: 200),
-                child: const Icon(Icons.expand_more_rounded, color: WeaverColors.textMuted, size: 18),
+                child: const Icon(Icons.expand_more_rounded,
+                    color: WeaverColors.textMuted, size: 18),
               ),
             ],
           ),
@@ -182,7 +198,11 @@ class _ToolCardBody extends StatelessWidget {
           const SizedBox(height: 12),
 
           // Description
-          Text(tool.description, style: const TextStyle(fontSize: 12, color: WeaverColors.textSecondary, height: 1.5)),
+          Text(tool.description,
+              style: const TextStyle(
+                  fontSize: 12,
+                  color: WeaverColors.textSecondary,
+                  height: 1.5)),
           const SizedBox(height: 12),
 
           // Auth status bar
@@ -191,32 +211,49 @@ class _ToolCardBody extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               'Connected as: ${_connectedAccount(tool)}',
-              style: const TextStyle(fontSize: 11, color: WeaverColors.textMuted),
+              style:
+                  const TextStyle(fontSize: 11, color: WeaverColors.textMuted),
             ),
           ],
           if (tool.id == 'filesystem') ...[
             const SizedBox(height: 10),
             _FilesystemRootEditor(tool: tool, provider: provider),
           ],
+          if (tool.id == 'discord') ...[
+            const SizedBox(height: 10),
+            const _DiscordChannelEditor(),
+          ],
           const SizedBox(height: 14),
 
           // Capabilities
-          const Text('Capabilities', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: WeaverColors.textMuted, letterSpacing: 0.5)),
+          const Text('Capabilities',
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: WeaverColors.textMuted,
+                  letterSpacing: 0.5)),
           const SizedBox(height: 8),
-          ...tool.capabilities.map((cap) => _CapabilityRow(cap: cap, color: tool.categoryColor)),
+          ...tool.capabilities.map(
+              (cap) => _CapabilityRow(cap: cap, color: tool.categoryColor)),
 
           // Last used
           if (tool.lastUsed != null) ...[
             const SizedBox(height: 12),
-            Container(height: 1, color: WeaverColors.cardBorder.withOpacity(0.4)),
+            Container(
+                height: 1, color: WeaverColors.cardBorder.withOpacity(0.4)),
             const SizedBox(height: 10),
             Row(
               children: [
-                const Icon(Icons.access_time_rounded, size: 12, color: WeaverColors.textMuted),
+                const Icon(Icons.access_time_rounded,
+                    size: 12, color: WeaverColors.textMuted),
                 const SizedBox(width: 5),
-                Text('Last used ${tool.lastUsed}', style: const TextStyle(fontSize: 11, color: WeaverColors.textMuted)),
+                Text('Last used ${tool.lastUsed}',
+                    style: const TextStyle(
+                        fontSize: 11, color: WeaverColors.textMuted)),
                 const Spacer(),
-                Text('${tool.usageCount} calls total', style: const TextStyle(fontSize: 11, color: WeaverColors.textMuted)),
+                Text('${tool.usageCount} calls total',
+                    style: const TextStyle(
+                        fontSize: 11, color: WeaverColors.textMuted)),
               ],
             ),
           ],
@@ -230,7 +267,9 @@ class _ToolCardBody extends StatelessWidget {
     final profile = metadata['profile'] as Map<String, dynamic>?;
     if (profile == null) return '';
     if (tool.id == 'discord') {
-      return profile['display_name']?.toString() ?? profile['username']?.toString() ?? '';
+      return profile['display_name']?.toString() ??
+          profile['username']?.toString() ??
+          '';
     }
     return profile['email']?.toString() ?? profile['name']?.toString() ?? '';
   }
@@ -286,12 +325,16 @@ class _FilesystemRootEditorState extends State<_FilesystemRootEditor> {
         children: [
           const Text(
             'Allowed Root Directory',
-            style: TextStyle(fontSize: 11, color: WeaverColors.textMuted, fontWeight: FontWeight.w600),
+            style: TextStyle(
+                fontSize: 11,
+                color: WeaverColors.textMuted,
+                fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 6),
           TextField(
             controller: _rootController,
-            style: const TextStyle(fontSize: 12, color: WeaverColors.textPrimary),
+            style:
+                const TextStyle(fontSize: 12, color: WeaverColors.textPrimary),
             decoration: const InputDecoration(
               hintText: '/home/user/projects/allowed-dir',
               isDense: true,
@@ -301,11 +344,106 @@ class _FilesystemRootEditorState extends State<_FilesystemRootEditor> {
           SizedBox(
             height: 28,
             child: ElevatedButton.icon(
-              onPressed: () => widget.provider.setFilesystemRoot(_rootController.text),
+              onPressed: () =>
+                  widget.provider.setFilesystemRoot(_rootController.text),
               icon: const Icon(Icons.save_rounded, size: 13),
               label: const Text('Save Root', style: TextStyle(fontSize: 11)),
-              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10)),
+              style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10)),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DiscordChannelEditor extends StatefulWidget {
+  const _DiscordChannelEditor();
+
+  @override
+  State<_DiscordChannelEditor> createState() => _DiscordChannelEditorState();
+}
+
+class _DiscordChannelEditorState extends State<_DiscordChannelEditor> {
+  late final TextEditingController _channelController;
+
+  @override
+  void initState() {
+    super.initState();
+    final backend = context.read<BackendProvider>();
+    _channelController = TextEditingController(text: backend.discordChannelId);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final saved = context.read<BackendProvider>().discordChannelId;
+    if (_channelController.text != saved) {
+      _channelController.text = saved;
+    }
+  }
+
+  @override
+  void dispose() {
+    _channelController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: WeaverColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: WeaverColors.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Default Discord Channel ID',
+            style: TextStyle(
+                fontSize: 11,
+                color: WeaverColors.textMuted,
+                fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _channelController,
+            keyboardType: TextInputType.number,
+            style:
+                const TextStyle(fontSize: 12, color: WeaverColors.textPrimary),
+            decoration: const InputDecoration(
+              hintText: '1494502217703620731',
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              SizedBox(
+                height: 28,
+                child: ElevatedButton.icon(
+                  onPressed: () => context
+                      .read<BackendProvider>()
+                      .setDiscordChannelId(_channelController.text),
+                  icon: const Icon(Icons.save_rounded, size: 13),
+                  label:
+                      const Text('Save Default', style: TextStyle(fontSize: 11)),
+                  style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Used automatically when prompt asks to send to Discord.',
+                  style: TextStyle(fontSize: 11, color: WeaverColors.textMuted),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -339,22 +477,27 @@ class _AuthStatusBar extends StatelessWidget {
                 onPressed: () => provider.connectTool(tool.id),
                 icon: const Icon(Icons.link_rounded, size: 13),
                 label: const Text('Connect', style: TextStyle(fontSize: 12)),
-                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12)),
+                style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12)),
               ),
             )
           else if (tool.authStatus == AuthStatus.pending)
             const SizedBox(
-              width: 14, height: 14,
-              child: CircularProgressIndicator(strokeWidth: 2, color: WeaverColors.warning),
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: WeaverColors.warning),
             )
           else if (tool.authStatus == AuthStatus.connected)
             SizedBox(
               height: 28,
               child: OutlinedButton.icon(
-                onPressed: () => Provider.of<AppState>(context, listen: false).setNavIndex(3),
+                onPressed: () => Provider.of<AppState>(context, listen: false)
+                    .setNavIndex(3),
                 icon: const Icon(Icons.settings_rounded, size: 12),
                 label: const Text('Settings', style: TextStyle(fontSize: 11)),
-                style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10)),
+                style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10)),
               ),
             ),
         ],
@@ -382,15 +525,22 @@ class _CapabilityRow extends StatelessWidget {
               color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(6),
             ),
-            child: Center(child: Text(cap.icon, style: const TextStyle(fontSize: 12))),
+            child: Center(
+                child: Text(cap.icon, style: const TextStyle(fontSize: 12))),
           ),
           const SizedBox(width: 9),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(cap.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: WeaverColors.textPrimary)),
-                Text(cap.description, style: const TextStyle(fontSize: 11, color: WeaverColors.textMuted)),
+                Text(cap.name,
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: WeaverColors.textPrimary)),
+                Text(cap.description,
+                    style: const TextStyle(
+                        fontSize: 11, color: WeaverColors.textMuted)),
               ],
             ),
           ),

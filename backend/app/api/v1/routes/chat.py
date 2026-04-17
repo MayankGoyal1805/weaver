@@ -30,6 +30,11 @@ async def agent_prompt(payload: AgentPromptIn) -> AgentPromptOut:
     enabled = set(payload.enabled_tool_ids)
     prompt_lower = payload.prompt.lower()
 
+    has_send_intent = any(x in prompt_lower for x in ["send", "post", "share", "forward", "publish", "notify"])
+    mentions_discord_target = any(
+        x in prompt_lower for x in ["discord", "channel", "server", "bot", "there", "that channel"]
+    )
+
     wants_latest_gmail = any(
         x in prompt_lower
         for x in [
@@ -54,17 +59,32 @@ async def agent_prompt(payload: AgentPromptIn) -> AgentPromptOut:
             "browse drive",
         ]
     )
-    wants_discord = any(x in prompt_lower for x in ["discord", "channel", "send to discord", "post to discord"])
+    wants_discord = "discord" in enabled and (
+        any(x in prompt_lower for x in ["discord", "channel", "send to discord", "post to discord"])
+        or (has_send_intent and mentions_discord_target)
+        or (
+            has_send_intent
+            and payload.discord_channel_id
+            and any(x in prompt_lower for x in ["email", "gmail", "summary", "summarize", "latest"])
+        )
+    )
 
     tool_calls: list[AgentToolCallOut] = []
     latest_email: dict | None = None
     drive_files: dict | None = None
+    gmail_error: str | None = None
 
     if wants_latest_gmail and "gmail" in enabled:
         out = await tool_execution_service.execute("google.gmail.get_latest_email", {})
         tool_calls.append(AgentToolCallOut(tool_id="google.gmail.get_latest_email", result=out))
         if out.get("status") == "ok":
             latest_email = out.get("result")
+        else:
+            gmail_error = (
+                (out.get("result") or {}).get("payload", {}).get("error")
+                or str((out.get("result") or {}).get("payload") or "")
+                or "Unknown Gmail tool error"
+            )
 
     if wants_drive_files and "google-drive" in enabled:
         out = await tool_execution_service.execute("google.drive.list_files", {"page_size": 10})
@@ -77,9 +97,9 @@ async def agent_prompt(payload: AgentPromptIn) -> AgentPromptOut:
     context_chunks: list[str] = []
 
     if latest_email is not None:
-        context_chunks.append(f"Latest Gmail:\n{latest_email}")
+        context_chunks.append(_compact_email_context(latest_email))
     if drive_files is not None:
-        context_chunks.append(f"Drive Files:\n{drive_files}")
+        context_chunks.append(_compact_drive_context(drive_files))
 
     if context_chunks:
         llm_prompt = payload.prompt + "\n\nTool results:\n" + "\n\n".join(context_chunks)
@@ -90,10 +110,52 @@ async def agent_prompt(payload: AgentPromptIn) -> AgentPromptOut:
             "Do not include code blocks, setup instructions, or policy text. "
             "Use plain text with sender, subject, and short summary only."
         )
-        llm_prompt = f"Create a concise Discord message for this Gmail item. Return message text only.\n\n{latest_email}"
+        llm_prompt = (
+            "Create a concise Discord message for this Gmail item. "
+            "Return message text only.\n\n"
+            f"{_compact_email_context(latest_email)}"
+        )
 
     chat_out: ChatOut | None = None
     chat_error: str | None = None
+
+    if wants_latest_gmail and latest_email is None and gmail_error is not None:
+        if "401" in gmail_error or "unauthorized" in gmail_error.lower():
+            chat_error = (
+                "Gmail access failed (401 Unauthorized). Please reconnect Google in Settings and try again."
+            )
+        else:
+            chat_error = f"Gmail fetch failed: {gmail_error}"
+
+        chat_out = ChatOut(
+            model_name=payload.model_name or "agent",
+            content=chat_error,
+            raw_response={"reason": "gmail_fetch_failed"},
+        )
+        return AgentPromptOut(
+            chat=chat_out,
+            chat_error=chat_error,
+            tool_calls=tool_calls,
+            discord_send=None,
+        )
+
+    if has_send_intent and "discord" in enabled and not payload.discord_channel_id:
+        chat_error = "Discord send was requested, but no default Discord channel id is configured in Settings."
+        chat_out = ChatOut(
+            model_name=payload.model_name or "agent",
+            content=(
+                "Discord send is enabled, but no default channel ID is configured. "
+                "Open Settings -> Agent Defaults -> Default Discord Channel ID, save it, then try again."
+            ),
+            raw_response={"reason": "missing_discord_channel_id"},
+        )
+        return AgentPromptOut(
+            chat=chat_out,
+            chat_error=chat_error,
+            tool_calls=tool_calls,
+            discord_send=None,
+        )
+
     try:
         out = await llm_service.chat(
             prompt=llm_prompt,
@@ -110,7 +172,11 @@ async def agent_prompt(payload: AgentPromptIn) -> AgentPromptOut:
         chat_error = f"LLM request failed: {exc}"
 
     discord_send: dict | None = None
-    if wants_discord and payload.discord_channel_id and "discord" in enabled:
+    can_send_discord = wants_discord and payload.discord_channel_id and "discord" in enabled
+    if wants_latest_gmail and latest_email is None:
+        can_send_discord = False
+
+    if can_send_discord:
         content = (chat_out.content if chat_out else "").strip()
         if not content and latest_email:
             content = _format_email_fallback(latest_email)
@@ -150,3 +216,34 @@ def _format_email_fallback(email: dict) -> str:
         f"Summary: {email.get('snippet', '')}\n"
         f"Body: {body}"
     )
+
+
+def _compact_email_context(email: dict) -> str:
+    body = (email.get("body_text") or email.get("snippet") or "").strip()
+    if len(body) > 1200:
+        body = body[:1200].rstrip() + "..."
+    snippet = (email.get("snippet") or "").strip()
+    if len(snippet) > 400:
+        snippet = snippet[:400].rstrip() + "..."
+
+    return (
+        "Latest Gmail:\n"
+        f"From: {email.get('from', '')}\n"
+        f"Subject: {email.get('subject', '(no subject)')}\n"
+        f"Date: {email.get('date', '')}\n"
+        f"Snippet: {snippet}\n"
+        f"Body: {body}"
+    )
+
+
+def _compact_drive_context(drive_files: dict) -> str:
+    files = (drive_files.get("files") or [])[:10]
+    lines: list[str] = ["Drive Files:"]
+    for item in files:
+        name = (item.get("name") or "").strip()
+        if len(name) > 140:
+            name = name[:140].rstrip() + "..."
+        mime = (item.get("mimeType") or "").strip()
+        modified = (item.get("modifiedTime") or "").strip()
+        lines.append(f"- {name} ({mime}) modified={modified}")
+    return "\n".join(lines)

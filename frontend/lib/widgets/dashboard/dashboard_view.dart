@@ -61,14 +61,22 @@ class _DashboardHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hour = DateTime.now().hour;
-    final greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    final greeting = hour < 12
+        ? 'Good morning'
+        : hour < 17
+            ? 'Good afternoon'
+            : 'Good evening';
     return Row(
       children: [
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(greeting, style: Theme.of(context).textTheme.headlineMedium?.copyWith(color: WeaverColors.textPrimary, fontWeight: FontWeight.w700)),
-            const Text('Your agentic workspace is ready', style: TextStyle(color: WeaverColors.textMuted, fontSize: 14)),
+            Text(greeting,
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    color: WeaverColors.textPrimary,
+                    fontWeight: FontWeight.w700)),
+            const Text('Your agentic workspace is ready',
+                style: TextStyle(color: WeaverColors.textMuted, fontSize: 14)),
           ],
         ),
         const Spacer(),
@@ -82,7 +90,8 @@ class _DashboardHeader extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         OutlinedButton.icon(
-          onPressed: () => Provider.of<AppState>(context, listen: false).setNavIndex(2),
+          onPressed: () =>
+              Provider.of<AppState>(context, listen: false).setNavIndex(2),
           icon: const Icon(Icons.account_tree_rounded, size: 14),
           label: const Text('Workflows'),
         ),
@@ -99,15 +108,44 @@ class _StatsRow extends StatelessWidget {
     return Consumer3<ChatProvider, ToolsProvider, WorkflowsProvider>(
       builder: (context, chatProv, toolsProv, wfProv, _) {
         final stats = [
-          _StatData(value: '${chatProv.sessions.length}', label: 'Active Chats', icon: Icons.chat_bubble_rounded, color: WeaverColors.accent),
-          _StatData(value: '${toolsProv.connectedCount}', label: 'Connected Tools', icon: Icons.extension_rounded, color: WeaverColors.success),
-          _StatData(value: '${wfProv.totalWorkflowCount}', label: 'Workflows', icon: Icons.account_tree_rounded, color: WeaverColors.info),
-          _StatData(value: '${wfProv.activeWorkflowCount}', label: 'Running Now', icon: Icons.bolt_rounded, color: WeaverColors.warning),
+          _StatData(
+              value: '${chatProv.sessions.length}',
+              label: 'Active Chats',
+              icon: Icons.chat_bubble_rounded,
+              color: WeaverColors.accent),
+          _StatData(
+              value: '${toolsProv.connectedCount}',
+              label: 'Connected Tools',
+              icon: Icons.extension_rounded,
+              color: WeaverColors.success),
+          _StatData(
+              value: '${wfProv.totalWorkflowCount}',
+              label: 'Workflows',
+              icon: Icons.account_tree_rounded,
+              color: WeaverColors.info),
+          _StatData(
+              value: '${wfProv.activeWorkflowCount}',
+              label: 'Running Now',
+              icon: Icons.bolt_rounded,
+              color: WeaverColors.warning),
         ];
         return Row(
-          children: stats.asMap().entries.map((e) => Expanded(
-            child: _StatCard(data: e.value).animate().fadeIn(delay: Duration(milliseconds: e.key * 80)).slideY(begin: 0.1, end: 0, delay: Duration(milliseconds: e.key * 80)),
-          )).toList().expand((w) => [w, const SizedBox(width: 16)]).toList()..removeLast(),
+          children: stats
+              .asMap()
+              .entries
+              .map((e) => Expanded(
+                    child: _StatCard(data: e.value)
+                        .animate()
+                        .fadeIn(delay: Duration(milliseconds: e.key * 80))
+                        .slideY(
+                            begin: 0.1,
+                            end: 0,
+                            delay: Duration(milliseconds: e.key * 80)),
+                  ))
+              .toList()
+              .expand((w) => [w, const SizedBox(width: 16)])
+              .toList()
+            ..removeLast(),
         );
       },
     );
@@ -119,7 +157,11 @@ class _StatData {
   final String label;
   final IconData icon;
   final Color color;
-  const _StatData({required this.value, required this.label, required this.icon, required this.color});
+  const _StatData(
+      {required this.value,
+      required this.label,
+      required this.icon,
+      required this.color});
 }
 
 class _StatCard extends StatelessWidget {
@@ -143,7 +185,8 @@ class _StatCard extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 44, height: 44,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
               color: data.color.withOpacity(0.12),
               borderRadius: BorderRadius.circular(10),
@@ -154,9 +197,16 @@ class _StatCard extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(data.value, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: data.color, height: 1)),
+              Text(data.value,
+                  style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w700,
+                      color: data.color,
+                      height: 1)),
               const SizedBox(height: 3),
-              Text(data.label, style: const TextStyle(fontSize: 12, color: WeaverColors.textMuted)),
+              Text(data.label,
+                  style: const TextStyle(
+                      fontSize: 12, color: WeaverColors.textMuted)),
             ],
           ),
         ],
@@ -184,12 +234,19 @@ class _ToolStatusCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.extension_rounded, size: 18, color: WeaverColors.accent),
+                  const Icon(Icons.extension_rounded,
+                      size: 18, color: WeaverColors.accent),
                   const SizedBox(width: 8),
-                  const Text('Tool Status', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: WeaverColors.textPrimary)),
+                  const Text('Tool Status',
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: WeaverColors.textPrimary)),
                   const Spacer(),
                   TextButton(
-                    onPressed: () => Provider.of<AppState>(context, listen: false).setRightPanelTab(0),
+                    onPressed: () =>
+                        Provider.of<AppState>(context, listen: false)
+                            .setRightPanelTab(0),
                     child: const Text('Manage', style: TextStyle(fontSize: 12)),
                   ),
                 ],
@@ -216,11 +273,15 @@ class _ToolStatusRow extends StatelessWidget {
         children: [
           Text(tool.logoEmoji, style: const TextStyle(fontSize: 16)),
           const SizedBox(width: 10),
-          Expanded(child: Text(tool.name, style: const TextStyle(fontSize: 13, color: WeaverColors.textSecondary))),
+          Expanded(
+              child: Text(tool.name,
+                  style: const TextStyle(
+                      fontSize: 13, color: WeaverColors.textSecondary))),
           StatusBadge(status: tool.authStatus),
           const SizedBox(width: 8),
           Container(
-            width: 80, height: 4,
+            width: 80,
+            height: 4,
             decoration: BoxDecoration(
               color: WeaverColors.surface,
               borderRadius: BorderRadius.circular(2),
@@ -239,7 +300,10 @@ class _ToolStatusRow extends StatelessWidget {
           const SizedBox(width: 6),
           SizedBox(
             width: 32,
-            child: Text('${tool.usageCount}', style: const TextStyle(fontSize: 10, color: WeaverColors.textMuted), textAlign: TextAlign.right),
+            child: Text('${tool.usageCount}',
+                style: const TextStyle(
+                    fontSize: 10, color: WeaverColors.textMuted),
+                textAlign: TextAlign.right),
           ),
         ],
       ),
@@ -251,11 +315,36 @@ class _RecentActivityCard extends StatelessWidget {
   const _RecentActivityCard();
 
   static const _activities = [
-    (icon: '✉️', text: 'Gmail: Fetched 8 emails', time: '10m ago', color: WeaverColors.cloudColor),
-    (icon: '🔍', text: 'Web Search: Queried "AI frameworks 2025"', time: '25m ago', color: WeaverColors.accentBright),
-    (icon: '⏰', text: 'Workflow "Morning Digest" ran successfully', time: '4h ago', color: WeaverColors.success),
-    (icon: '🗂️', text: 'Drive Backup: Copied 3 files to /Backups', time: '4h 5m ago', color: WeaverColors.cloudColor),
-    (icon: '🗄️', text: 'Filesystem: Listed /Projects directory', time: '5h ago', color: WeaverColors.filesColor),
+    (
+      icon: '✉️',
+      text: 'Gmail: Fetched 8 emails',
+      time: '10m ago',
+      color: WeaverColors.cloudColor
+    ),
+    (
+      icon: '🔍',
+      text: 'Web Search: Queried "AI frameworks 2025"',
+      time: '25m ago',
+      color: WeaverColors.accentBright
+    ),
+    (
+      icon: '⏰',
+      text: 'Workflow "Morning Digest" ran successfully',
+      time: '4h ago',
+      color: WeaverColors.success
+    ),
+    (
+      icon: '🗂️',
+      text: 'Drive Backup: Copied 3 files to /Backups',
+      time: '4h 5m ago',
+      color: WeaverColors.cloudColor
+    ),
+    (
+      icon: '🗄️',
+      text: 'Filesystem: Listed /Projects directory',
+      time: '5h ago',
+      color: WeaverColors.filesColor
+    ),
   ];
 
   @override
@@ -272,19 +361,24 @@ class _RecentActivityCard extends StatelessWidget {
         children: [
           const Row(
             children: [
-              Icon(Icons.timeline_rounded, size: 18, color: WeaverColors.accent),
+              Icon(Icons.timeline_rounded,
+                  size: 18, color: WeaverColors.accent),
               SizedBox(width: 8),
-              Text('Recent Activity', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: WeaverColors.textPrimary)),
+              Text('Recent Activity',
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: WeaverColors.textPrimary)),
             ],
           ),
           const SizedBox(height: 16),
           ..._activities.asMap().entries.map((e) => _ActivityRow(
-            icon: e.value.icon,
-            text: e.value.text,
-            time: e.value.time,
-            color: e.value.color,
-            isLast: e.key == _activities.length - 1,
-          )),
+                icon: e.value.icon,
+                text: e.value.text,
+                time: e.value.time,
+                color: e.value.color,
+                isLast: e.key == _activities.length - 1,
+              )),
         ],
       ),
     );
@@ -298,7 +392,12 @@ class _ActivityRow extends StatelessWidget {
   final Color color;
   final bool isLast;
 
-  const _ActivityRow({required this.icon, required this.text, required this.time, required this.color, required this.isLast});
+  const _ActivityRow(
+      {required this.icon,
+      required this.text,
+      required this.time,
+      required this.color,
+      required this.isLast});
 
   @override
   Widget build(BuildContext context) {
@@ -308,11 +407,15 @@ class _ActivityRow extends StatelessWidget {
         Column(
           children: [
             Container(
-              width: 30, height: 30,
-              decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
-              child: Center(child: Text(icon, style: const TextStyle(fontSize: 13))),
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                  color: color.withOpacity(0.1), shape: BoxShape.circle),
+              child: Center(
+                  child: Text(icon, style: const TextStyle(fontSize: 13))),
             ),
-            if (!isLast) Container(width: 1, height: 18, color: WeaverColors.cardBorder),
+            if (!isLast)
+              Container(width: 1, height: 18, color: WeaverColors.cardBorder),
           ],
         ),
         const SizedBox(width: 12),
@@ -321,9 +424,14 @@ class _ActivityRow extends StatelessWidget {
             padding: const EdgeInsets.only(top: 6, bottom: 10),
             child: Row(
               children: [
-                Expanded(child: Text(text, style: const TextStyle(fontSize: 12, color: WeaverColors.textSecondary))),
+                Expanded(
+                    child: Text(text,
+                        style: const TextStyle(
+                            fontSize: 12, color: WeaverColors.textSecondary))),
                 const SizedBox(width: 8),
-                Text(time, style: const TextStyle(fontSize: 11, color: WeaverColors.textMuted)),
+                Text(time,
+                    style: const TextStyle(
+                        fontSize: 11, color: WeaverColors.textMuted)),
               ],
             ),
           ),
@@ -352,18 +460,28 @@ class _WorkflowsCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.account_tree_rounded, size: 18, color: WeaverColors.accent),
+                  const Icon(Icons.account_tree_rounded,
+                      size: 18, color: WeaverColors.accent),
                   const SizedBox(width: 8),
-                  const Text('Workflows', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: WeaverColors.textPrimary)),
+                  const Text('Workflows',
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: WeaverColors.textPrimary)),
                   const Spacer(),
                   TextButton(
-                    onPressed: () => Provider.of<AppState>(context, listen: false).setNavIndex(2),
-                    child: const Text('View All', style: TextStyle(fontSize: 12)),
+                    onPressed: () =>
+                        Provider.of<AppState>(context, listen: false)
+                            .setNavIndex(2),
+                    child:
+                        const Text('View All', style: TextStyle(fontSize: 12)),
                   ),
                 ],
               ),
               const SizedBox(height: 14),
-              ...wfProv.workflows.take(4).map((wf) => _WorkflowRow(workflow: wf, wfProv: wfProv)),
+              ...wfProv.workflows
+                  .take(4)
+                  .map((wf) => _WorkflowRow(workflow: wf, wfProv: wfProv)),
             ],
           ),
         );
@@ -398,9 +516,18 @@ class _WorkflowRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(workflow.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: WeaverColors.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text(workflow.name,
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: WeaverColors.textPrimary),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 2),
-                  Text('${workflow.nodes.length} nodes · ${workflow.runCount} runs', style: const TextStyle(fontSize: 11, color: WeaverColors.textMuted)),
+                  Text(
+                      '${workflow.nodes.length} nodes · ${workflow.runCount} runs',
+                      style: const TextStyle(
+                          fontSize: 11, color: WeaverColors.textMuted)),
                 ],
               ),
             ),
@@ -435,9 +562,14 @@ class _AgentCard extends StatelessWidget {
           children: [
             const Row(
               children: [
-                Icon(Icons.psychology_rounded, size: 18, color: WeaverColors.accent),
+                Icon(Icons.psychology_rounded,
+                    size: 18, color: WeaverColors.accent),
                 SizedBox(width: 8),
-                Text('Active Agent', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: WeaverColors.textPrimary)),
+                Text('Active Agent',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: WeaverColors.textPrimary)),
               ],
             ),
             const SizedBox(height: 16),
@@ -454,27 +586,48 @@ class _AgentCard extends StatelessWidget {
                   Row(
                     children: [
                       Container(
-                        width: 8, height: 8,
-                        decoration: const BoxDecoration(color: WeaverColors.success, shape: BoxShape.circle),
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                            color: WeaverColors.success,
+                            shape: BoxShape.circle),
                       ),
                       const SizedBox(width: 8),
-                      const Text('Weaver Agent', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: WeaverColors.textPrimary)),
+                      const Text('Weaver Agent',
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: WeaverColors.textPrimary)),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text(modelProv.selectedModel.name, style: const TextStyle(fontSize: 12, color: WeaverColors.accent, fontWeight: FontWeight.w500)),
+                  Text(modelProv.modelName,
+                      style: const TextStyle(
+                          fontSize: 12,
+                          color: WeaverColors.accent,
+                          fontWeight: FontWeight.w500)),
                   const SizedBox(height: 4),
-                  Text(modelProv.selectedModel.description, style: const TextStyle(fontSize: 11, color: WeaverColors.textMuted), maxLines: 2),
+                  const Text(
+                      'Custom model configured in the right sidebar model panel.',
+                      style: TextStyle(
+                          fontSize: 11, color: WeaverColors.textMuted),
+                      maxLines: 2),
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Icon(Icons.memory_rounded, size: 12, color: WeaverColors.textMuted),
+                      const Icon(Icons.memory_rounded,
+                          size: 12, color: WeaverColors.textMuted),
                       const SizedBox(width: 4),
-                      Text('${modelProv.maxTokens} max tokens', style: const TextStyle(fontSize: 11, color: WeaverColors.textMuted)),
+                      Text('${modelProv.maxTokens} max tokens',
+                          style: const TextStyle(
+                              fontSize: 11, color: WeaverColors.textMuted)),
                       const SizedBox(width: 10),
-                      const Icon(Icons.thermostat_rounded, size: 12, color: WeaverColors.textMuted),
+                      const Icon(Icons.thermostat_rounded,
+                          size: 12, color: WeaverColors.textMuted),
                       const SizedBox(width: 4),
-                      Text('T: ${modelProv.temperature.toStringAsFixed(1)}', style: const TextStyle(fontSize: 11, color: WeaverColors.textMuted)),
+                      Text('T: ${modelProv.temperature.toStringAsFixed(1)}',
+                          style: const TextStyle(
+                              fontSize: 11, color: WeaverColors.textMuted)),
                     ],
                   ),
                 ],
@@ -484,7 +637,8 @@ class _AgentCard extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () => Provider.of<AppState>(context, listen: false).setRightPanelTab(2),
+                onPressed: () => Provider.of<AppState>(context, listen: false)
+                    .setRightPanelTab(2),
                 icon: const Icon(Icons.tune_rounded, size: 13),
                 label: const Text('Configure', style: TextStyle(fontSize: 12)),
               ),

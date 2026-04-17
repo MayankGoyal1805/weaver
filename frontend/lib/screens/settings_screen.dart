@@ -14,7 +14,8 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _baseUrlController = TextEditingController();
-  final TextEditingController _discordChannelController = TextEditingController();
+  final TextEditingController _discordChannelController =
+      TextEditingController();
   final TextEditingController _llmApiKeyController = TextEditingController();
   final TextEditingController _llmBaseUrlController = TextEditingController();
   bool _obscureApiKey = true;
@@ -49,7 +50,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               const Text(
                 'Settings',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: WeaverColors.textPrimary),
+                style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: WeaverColors.textPrimary),
               ),
               const SizedBox(height: 6),
               const Text(
@@ -98,7 +102,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        const Text('Auto-start backend with app', style: TextStyle(color: WeaverColors.textSecondary, fontSize: 13)),
+                        const Text('Auto-start backend with app',
+                            style: TextStyle(
+                                color: WeaverColors.textSecondary,
+                                fontSize: 13)),
                         const Spacer(),
                         Switch(
                           value: backend.autoStartBackend,
@@ -106,12 +113,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ],
                     ),
-                    if (backend.lastError != null && backend.lastError!.isNotEmpty)
+                    if (backend.lastError != null &&
+                        backend.lastError!.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(
                           backend.lastError!,
-                          style: const TextStyle(fontSize: 12, color: WeaverColors.error),
+                          style: const TextStyle(
+                              fontSize: 12, color: WeaverColors.error),
                         ),
                       ),
                   ],
@@ -136,8 +145,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       hint: 'sk-...',
                       obscureText: _obscureApiKey,
                       trailing: IconButton(
-                        icon: Icon(_obscureApiKey ? Icons.visibility_rounded : Icons.visibility_off_rounded),
-                        onPressed: () => setState(() => _obscureApiKey = !_obscureApiKey),
+                        icon: Icon(_obscureApiKey
+                            ? Icons.visibility_rounded
+                            : Icons.visibility_off_rounded),
+                        onPressed: () =>
+                            setState(() => _obscureApiKey = !_obscureApiKey),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -152,7 +164,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 10),
                     const Text(
                       'Model name is configured from the right sidebar model panel.',
-                      style: TextStyle(fontSize: 12, color: WeaverColors.textMuted),
+                      style: TextStyle(
+                          fontSize: 12, color: WeaverColors.textMuted),
                     ),
                   ],
                 ),
@@ -178,15 +191,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _UserInfoTile(
                       title: 'Google account',
                       info: backend.googleUserInfo,
-                      primary: (backend.googleUserInfo['profile'] as Map<String, dynamic>? ?? const {})['email']?.toString(),
-                      secondary: (backend.googleUserInfo['profile'] as Map<String, dynamic>? ?? const {})['name']?.toString(),
+                      primary: (backend.googleUserInfo['profile']
+                                  as Map<String, dynamic>? ??
+                              const {})['email']
+                          ?.toString(),
+                      secondary: (backend.googleUserInfo['profile']
+                                  as Map<String, dynamic>? ??
+                              const {})['name']
+                          ?.toString(),
                     ),
                     const SizedBox(height: 8),
                     _UserInfoTile(
                       title: 'Discord account',
                       info: backend.discordUserInfo,
-                      primary: (backend.discordUserInfo['profile'] as Map<String, dynamic>? ?? const {})['display_name']?.toString(),
-                      secondary: (backend.discordUserInfo['profile'] as Map<String, dynamic>? ?? const {})['email']?.toString(),
+                      primary: (backend.discordUserInfo['profile']
+                                  as Map<String, dynamic>? ??
+                              const {})['display_name']
+                          ?.toString(),
+                      secondary: (backend.discordUserInfo['profile']
+                                  as Map<String, dynamic>? ??
+                              const {})['email']
+                          ?.toString(),
                     ),
                     const SizedBox(height: 8),
                     _BotInfoTile(status: backend.discordBotStatus),
@@ -205,7 +230,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         const SizedBox(width: 8),
                         Text(
                           tools.lastError ?? '',
-                          style: const TextStyle(fontSize: 12, color: WeaverColors.error),
+                          style: const TextStyle(
+                              fontSize: 12, color: WeaverColors.error),
                         ),
                       ],
                     ),
@@ -226,14 +252,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 8),
                     ElevatedButton.icon(
-                      onPressed: () => backend.setDiscordChannelId(_discordChannelController.text),
+                      onPressed: () => backend
+                          .setDiscordChannelId(_discordChannelController.text),
                       icon: const Icon(Icons.save_rounded, size: 14),
                       label: const Text('Save Channel ID'),
                     ),
                     const SizedBox(height: 12),
                     const Text(
                       'This channel is used when prompt includes Discord send intent.',
-                      style: TextStyle(fontSize: 12, color: WeaverColors.textMuted),
+                      style: TextStyle(
+                          fontSize: 12, color: WeaverColors.textMuted),
                     ),
                   ],
                 ),
@@ -273,7 +301,8 @@ class _Section extends StatelessWidget {
   final IconData icon;
   final Widget child;
 
-  const _Section({required this.title, required this.icon, required this.child});
+  const _Section(
+      {required this.title, required this.icon, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -291,7 +320,11 @@ class _Section extends StatelessWidget {
             children: [
               Icon(icon, size: 18, color: WeaverColors.accent),
               const SizedBox(width: 8),
-              Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: WeaverColors.textPrimary)),
+              Text(title,
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: WeaverColors.textPrimary)),
             ],
           ),
           const SizedBox(height: 16),
@@ -322,13 +355,18 @@ class _LabeledField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: WeaverColors.textMuted, fontWeight: FontWeight.w500)),
+        Text(label,
+            style: const TextStyle(
+                fontSize: 12,
+                color: WeaverColors.textMuted,
+                fontWeight: FontWeight.w500)),
         const SizedBox(height: 5),
         TextField(
           controller: controller,
           obscureText: obscureText,
           style: const TextStyle(fontSize: 12, color: WeaverColors.textPrimary),
-          decoration: InputDecoration(hintText: hint, isDense: true, suffixIcon: trailing),
+          decoration: InputDecoration(
+              hintText: hint, isDense: true, suffixIcon: trailing),
         ),
       ],
     );
@@ -362,16 +400,28 @@ class _UserInfoTile extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontSize: 12, color: WeaverColors.textPrimary, fontWeight: FontWeight.w600)),
+          Text(title,
+              style: const TextStyle(
+                  fontSize: 12,
+                  color: WeaverColors.textPrimary,
+                  fontWeight: FontWeight.w600)),
           const SizedBox(height: 2),
           Text(
             authenticated
-                ? (primary == null || primary!.isEmpty ? 'Authenticated' : primary!)
+                ? (primary == null || primary!.isEmpty
+                    ? 'Authenticated'
+                    : primary!)
                 : 'Not authenticated',
-            style: TextStyle(fontSize: 12, color: authenticated ? WeaverColors.success : WeaverColors.textMuted),
+            style: TextStyle(
+                fontSize: 12,
+                color: authenticated
+                    ? WeaverColors.success
+                    : WeaverColors.textMuted),
           ),
           if (secondary != null && secondary!.isNotEmpty)
-            Text(secondary!, style: const TextStyle(fontSize: 11, color: WeaverColors.textMuted)),
+            Text(secondary!,
+                style: const TextStyle(
+                    fontSize: 11, color: WeaverColors.textMuted)),
         ],
       ),
     );
@@ -399,14 +449,25 @@ class _BotInfoTile extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Discord bot token status', style: TextStyle(fontSize: 12, color: WeaverColors.textPrimary, fontWeight: FontWeight.w600)),
+          const Text('Discord bot token status',
+              style: TextStyle(
+                  fontSize: 12,
+                  color: WeaverColors.textPrimary,
+                  fontWeight: FontWeight.w600)),
           const SizedBox(height: 2),
           Text(
-            configured ? 'Configured${username.isNotEmpty ? ': $username' : ''}' : 'Not configured',
-            style: TextStyle(fontSize: 12, color: configured ? WeaverColors.success : WeaverColors.warning),
+            configured
+                ? 'Configured${username.isNotEmpty ? ': $username' : ''}'
+                : 'Not configured',
+            style: TextStyle(
+                fontSize: 12,
+                color:
+                    configured ? WeaverColors.success : WeaverColors.warning),
           ),
           if (error.isNotEmpty)
-            Text(error, style: const TextStyle(fontSize: 11, color: WeaverColors.error)),
+            Text(error,
+                style:
+                    const TextStyle(fontSize: 11, color: WeaverColors.error)),
         ],
       ),
     );
@@ -429,7 +490,11 @@ class _ConnectionPill extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: WeaverColors.warning.withOpacity(0.4)),
         ),
-        child: const Text('Starting...', style: TextStyle(fontSize: 11, color: WeaverColors.warning, fontWeight: FontWeight.w600)),
+        child: const Text('Starting...',
+            style: TextStyle(
+                fontSize: 11,
+                color: WeaverColors.warning,
+                fontWeight: FontWeight.w600)),
       );
     }
 
@@ -438,11 +503,16 @@ class _ConnectionPill extends StatelessWidget {
       decoration: BoxDecoration(
         color: connected ? WeaverColors.successDim : WeaverColors.errorDim,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: (connected ? WeaverColors.success : WeaverColors.error).withOpacity(0.4)),
+        border: Border.all(
+            color: (connected ? WeaverColors.success : WeaverColors.error)
+                .withOpacity(0.4)),
       ),
       child: Text(
         connected ? 'Connected' : 'Disconnected',
-        style: TextStyle(fontSize: 11, color: connected ? WeaverColors.success : WeaverColors.error, fontWeight: FontWeight.w600),
+        style: TextStyle(
+            fontSize: 11,
+            color: connected ? WeaverColors.success : WeaverColors.error,
+            fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -453,7 +523,8 @@ class _AuthRow extends StatelessWidget {
   final AuthStatus? status;
   final Future<void> Function() onConnect;
 
-  const _AuthRow({required this.title, required this.status, required this.onConnect});
+  const _AuthRow(
+      {required this.title, required this.status, required this.onConnect});
 
   @override
   Widget build(BuildContext context) {
@@ -471,7 +542,11 @@ class _AuthRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(fontSize: 13, color: WeaverColors.textPrimary, fontWeight: FontWeight.w500)),
+              Text(title,
+                  style: const TextStyle(
+                      fontSize: 13,
+                      color: WeaverColors.textPrimary,
+                      fontWeight: FontWeight.w500)),
               const SizedBox(height: 2),
               Text(label, style: TextStyle(fontSize: 11, color: color)),
             ],

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../theme/colors.dart';
 
 enum ToolCategory { cloud, messaging, files, dev, productivity, ai }
 

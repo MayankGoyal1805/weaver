@@ -1,4 +1,5 @@
 from urllib.parse import urljoin
+import re
 
 import httpx
 
@@ -35,18 +36,11 @@ class LLMService:
             "Content-Type": "application/json",
         }
 
-        messages = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        for item in history or []:
-            role = item.get("role", "user")
-            content = item.get("content", "")
-            if not content:
-                continue
-            if role not in {"user", "assistant", "system"}:
-                continue
-            messages.append({"role": role, "content": content})
-        messages.append({"role": "user", "content": prompt})
+        messages = _build_bounded_messages(
+            prompt=prompt,
+            system_prompt=system_prompt,
+            history=history or [],
+        )
 
         payload = {
             "model": chosen_model,
@@ -71,3 +65,69 @@ class LLMService:
 
 
 llm_service = LLMService()
+
+
+_MAX_HISTORY_MESSAGES = 12
+_MAX_SINGLE_MESSAGE_CHARS = 1800
+_MAX_PROMPT_CHARS = 3500
+_MAX_SYSTEM_CHARS = 1200
+_MAX_TOTAL_CHARS = 12000
+
+
+def _build_bounded_messages(prompt: str, system_prompt: str | None, history: list[dict]) -> list[dict]:
+    bounded: list[dict] = []
+
+    if system_prompt:
+        bounded.append({"role": "system", "content": _trim_text(system_prompt, _MAX_SYSTEM_CHARS)})
+
+    cleaned_history: list[dict] = []
+    for item in history[-_MAX_HISTORY_MESSAGES:]:
+        role = item.get("role", "user")
+        content = item.get("content", "")
+        if role not in {"user", "assistant", "system"}:
+            continue
+        if not content:
+            continue
+        text = _strip_think(content)
+        text = _trim_text(text, _MAX_SINGLE_MESSAGE_CHARS)
+        if not text:
+            continue
+        cleaned_history.append({"role": role, "content": text})
+
+    prompt_text = _trim_text(_strip_think(prompt), _MAX_PROMPT_CHARS)
+    bounded.extend(cleaned_history)
+    bounded.append({"role": "user", "content": prompt_text})
+
+    # Enforce hard total budget by trimming oldest history first.
+    while _total_chars(bounded) > _MAX_TOTAL_CHARS:
+        # Preserve system (index 0 if present) and last user prompt.
+        if len(bounded) <= 2:
+            break
+        remove_index = 1 if bounded[0].get("role") == "system" else 0
+        if remove_index >= len(bounded) - 1:
+            break
+        bounded.pop(remove_index)
+
+    # Final safety: if still oversized, trim final user prompt.
+    if _total_chars(bounded) > _MAX_TOTAL_CHARS and bounded:
+        overflow = _total_chars(bounded) - _MAX_TOTAL_CHARS
+        last = bounded[-1]
+        shortened = _trim_text(last.get("content", ""), max(200, len(last.get("content", "")) - overflow - 32))
+        bounded[-1] = {"role": last.get("role", "user"), "content": shortened}
+
+    return bounded
+
+
+def _strip_think(text: str) -> str:
+    return re.sub(r"<think>[\s\S]*?</think>", "", text, flags=re.IGNORECASE).strip()
+
+
+def _trim_text(text: str, max_chars: int) -> str:
+    value = (text or "").strip()
+    if len(value) <= max_chars:
+        return value
+    return value[: max_chars - 3].rstrip() + "..."
+
+
+def _total_chars(messages: list[dict]) -> int:
+    return sum(len((msg.get("content") or "")) for msg in messages)

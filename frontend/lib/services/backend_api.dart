@@ -13,7 +13,9 @@ class BackendApi {
   String baseUrl;
 
   Uri _uri(String path) {
-    final normalized = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    final normalized = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
     return Uri.parse('$normalized$path');
   }
 
@@ -33,7 +35,8 @@ class BackendApi {
     return jsonDecode(res.body) as List<dynamic>;
   }
 
-  Future<Map<String, dynamic>> postJson(String path, Map<String, dynamic> payload) async {
+  Future<Map<String, dynamic>> postJson(
+      String path, Map<String, dynamic> payload) async {
     final res = await http.post(
       _uri(path),
       headers: {'Content-Type': 'application/json'},
@@ -54,7 +57,9 @@ class BackendRuntime {
 
   Future<bool> isHealthy(String baseUrl) async {
     try {
-      final res = await http.get(Uri.parse('$baseUrl/health')).timeout(const Duration(seconds: 2));
+      final res = await http
+          .get(Uri.parse('$baseUrl/health'))
+          .timeout(const Duration(seconds: 2));
       return res.statusCode == 200;
     } catch (_) {
       return false;
@@ -88,7 +93,8 @@ class BackendRuntime {
       '$port',
     ];
 
-    _process = await Process.start('uv', args, workingDirectory: backendDir.path);
+    _process =
+        await Process.start('uv', args, workingDirectory: backendDir.path);
     _startedByApp = true;
 
     unawaited(_process!.stdout.transform(utf8.decoder).forEach((_) {}));
@@ -134,8 +140,8 @@ class BackendPreferences {
   static const _keyLlmApiKey = 'backend.llmApiKey';
   static const _keyLlmBaseUrl = 'backend.llmBaseUrl';
   static const _keyFilesystemRoot = 'backend.filesystemRoot';
-  static const _keyChatSessions = 'chat.sessions.v1';
-  static const _keyChatActiveSession = 'chat.activeSession.v1';
+  static const _keyChatSessions = 'chat.sessions.v2';
+  static const _keyChatActiveSession = 'chat.activeSession.v2';
   static const _keyModelName = 'model.name';
   static const _keySystemPrompt = 'model.systemPrompt';
   static const _keyTemperature = 'model.temperature';

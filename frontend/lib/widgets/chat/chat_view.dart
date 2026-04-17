@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
 import '../../providers/providers.dart';
 import '../../theme/colors.dart';
@@ -23,13 +24,14 @@ class ChatView extends StatelessWidget {
             const _ToolChipStrip(),
             const Divider(height: 1),
             Expanded(child: _MessageList(session: session)),
-            if (chatProvider.isTyping) Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: TypingIndicator(agentName: session.agentName),
+            if (chatProvider.isTypingFor(session.id))
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: TypingIndicator(agentName: session.agentName),
+                ),
               ),
-            ),
             _ChatInput(session: session),
           ],
         );
@@ -56,13 +58,17 @@ class _EmptyChatState extends StatelessWidget {
               border: Border.all(color: WeaverColors.accent.withOpacity(0.3)),
             ),
             child: const Center(
-              child: Text('⟆', style: TextStyle(fontSize: 36, color: WeaverColors.accent)),
+              child: Text('⟆',
+                  style: TextStyle(fontSize: 36, color: WeaverColors.accent)),
             ),
           ).animate().scale(duration: 500.ms, curve: Curves.elasticOut),
           const SizedBox(height: 24),
           Text(
             'Start a conversation',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: WeaverColors.textPrimary),
+            style: Theme.of(context)
+                .textTheme
+                .headlineSmall
+                ?.copyWith(color: WeaverColors.textPrimary),
           ).animate().fadeIn(delay: 200.ms),
           const SizedBox(height: 8),
           const Text(
@@ -104,11 +110,16 @@ class _ChatHeader extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(session.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: WeaverColors.textPrimary)),
+              Text(session.title,
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: WeaverColors.textPrimary)),
               Consumer<ModelProvider>(
                 builder: (_, modelProv, __) => Text(
                   '${session.agentName} • ${modelProv.modelName}',
-                  style: const TextStyle(fontSize: 11, color: WeaverColors.textMuted),
+                  style: const TextStyle(
+                      fontSize: 11, color: WeaverColors.textMuted),
                 ),
               ),
             ],
@@ -124,7 +135,9 @@ class _ChatHeader extends StatelessWidget {
                 },
                 icon: const Icon(Icons.account_tree_rounded, size: 14),
                 label: Text(count > 0 ? '$count workflows' : 'Add workflow'),
-                style: TextButton.styleFrom(foregroundColor: WeaverColors.accent, textStyle: const TextStyle(fontSize: 12)),
+                style: TextButton.styleFrom(
+                    foregroundColor: WeaverColors.accent,
+                    textStyle: const TextStyle(fontSize: 12)),
               );
             },
           ),
@@ -151,20 +164,27 @@ class _ToolChipStrip extends StatelessWidget {
       builder: (context, chatProv, toolsProv, _) {
         final session = chatProv.activeSession;
         if (session == null) return const SizedBox.shrink();
-        final enabledTools = toolsProv.tools.where((t) => session.enabledToolIds.contains(t.id)).toList();
+        final enabledTools = toolsProv.tools
+            .where((t) => session.enabledToolIds.contains(t.id))
+            .toList();
 
         return Container(
           height: 42,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           child: Row(
             children: [
-              const Text('Tools:', style: TextStyle(fontSize: 12, color: WeaverColors.textMuted, fontWeight: FontWeight.w500)),
+              const Text('Tools:',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: WeaverColors.textMuted,
+                      fontWeight: FontWeight.w500)),
               const SizedBox(width: 8),
               Expanded(
                 child: ListView(
                   scrollDirection: Axis.horizontal,
                   children: [
-                    ...enabledTools.map((t) => _ToolChip(tool: t, enabled: true)),
+                    ...enabledTools
+                        .map((t) => _ToolChip(tool: t, enabled: true)),
                     _AddToolChip(),
                   ],
                 ),
@@ -198,23 +218,32 @@ class _ToolChipState extends State<_ToolChip> {
       child: GestureDetector(
         onTap: () {
           Provider.of<AppState>(context, listen: false).setRightPanelTab(0);
-          Provider.of<ToolsProvider>(context, listen: false).toggleExpanded(widget.tool.id);
+          Provider.of<ToolsProvider>(context, listen: false)
+              .toggleExpanded(widget.tool.id);
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
           margin: const EdgeInsets.only(right: 6),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: _hovered ? widget.tool.categoryColor.withOpacity(0.15) : widget.tool.categoryColor.withOpacity(0.08),
+            color: _hovered
+                ? widget.tool.categoryColor.withOpacity(0.15)
+                : widget.tool.categoryColor.withOpacity(0.08),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: widget.tool.categoryColor.withOpacity(_hovered ? 0.5 : 0.25)),
+            border: Border.all(
+                color: widget.tool.categoryColor
+                    .withOpacity(_hovered ? 0.5 : 0.25)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(widget.tool.logoEmoji, style: const TextStyle(fontSize: 11)),
               const SizedBox(width: 5),
-              Text(widget.tool.name, style: TextStyle(fontSize: 11, color: widget.tool.categoryColor, fontWeight: FontWeight.w500)),
+              Text(widget.tool.name,
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: widget.tool.categoryColor,
+                      fontWeight: FontWeight.w500)),
             ],
           ),
         ),
@@ -238,7 +267,8 @@ class _AddToolChipState extends State<_AddToolChip> {
       onExit: (_) => setState(() => _hovered = false),
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
-        onTap: () => Provider.of<AppState>(context, listen: false).setRightPanelTab(0),
+        onTap: () =>
+            Provider.of<AppState>(context, listen: false).setRightPanelTab(0),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
           margin: const EdgeInsets.only(right: 6),
@@ -246,14 +276,17 @@ class _AddToolChipState extends State<_AddToolChip> {
           decoration: BoxDecoration(
             color: _hovered ? WeaverColors.cardHover : Colors.transparent,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: WeaverColors.cardBorder, style: BorderStyle.solid),
+            border: Border.all(
+                color: WeaverColors.cardBorder, style: BorderStyle.solid),
           ),
           child: const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.add_rounded, size: 12, color: WeaverColors.textMuted),
               SizedBox(width: 4),
-              Text('Add tool', style: TextStyle(fontSize: 11, color: WeaverColors.textMuted)),
+              Text('Add tool',
+                  style:
+                      TextStyle(fontSize: 11, color: WeaverColors.textMuted)),
             ],
           ),
         ),
@@ -323,15 +356,18 @@ class _WelcomePanel extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Text('What can I help you with?',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: WeaverColors.textPrimary)),
+                style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w600,
+                    color: WeaverColors.textPrimary)),
             const SizedBox(height: 8),
             const Text('Use the tools in the right panel or ask me anything.',
                 style: TextStyle(fontSize: 14, color: WeaverColors.textMuted)),
             const SizedBox(height: 28),
             ...suggestions.asMap().entries.map((e) => _SuggestionCard(
-              label: e.value,
-              delay: e.key * 60,
-            )),
+                  label: e.value,
+                  delay: e.key * 60,
+                )),
           ],
         ),
       ),
@@ -371,21 +407,28 @@ class _SuggestionCardState extends State<_SuggestionCard> {
             color: _hovered ? WeaverColors.cardHover : WeaverColors.card,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: _hovered ? WeaverColors.accent.withOpacity(0.4) : WeaverColors.cardBorder,
+              color: _hovered
+                  ? WeaverColors.accent.withOpacity(0.4)
+                  : WeaverColors.cardBorder,
             ),
           ),
           child: Row(
             children: [
-              Expanded(child: Text(widget.label, style: const TextStyle(fontSize: 13, color: WeaverColors.textSecondary))),
-              Icon(Icons.arrow_forward_rounded, size: 15, color: _hovered ? WeaverColors.accent : WeaverColors.textDisabled),
+              Expanded(
+                  child: Text(widget.label,
+                      style: const TextStyle(
+                          fontSize: 13, color: WeaverColors.textSecondary))),
+              Icon(Icons.arrow_forward_rounded,
+                  size: 15,
+                  color: _hovered
+                      ? WeaverColors.accent
+                      : WeaverColors.textDisabled),
             ],
           ),
         ),
       ),
-    )
-        .animate()
-        .fadeIn(delay: Duration(milliseconds: widget.delay))
-        .slideY(begin: 0.1, end: 0, delay: Duration(milliseconds: widget.delay));
+    ).animate().fadeIn(delay: Duration(milliseconds: widget.delay)).slideY(
+        begin: 0.1, end: 0, delay: Duration(milliseconds: widget.delay));
   }
 }
 
@@ -398,7 +441,9 @@ class MessageBubble extends StatelessWidget {
     final isUser = message.role == MessageRole.user;
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
-      child: isUser ? _UserBubble(message: message) : _AssistantBubble(message: message),
+      child: isUser
+          ? _UserBubble(message: message)
+          : _AssistantBubble(message: message),
     );
   }
 }
@@ -427,17 +472,27 @@ class _UserBubble extends StatelessWidget {
               ),
               border: Border.all(color: WeaverColors.accent.withOpacity(0.3)),
             ),
-            child: Text(message.content, style: const TextStyle(fontSize: 14, color: WeaverColors.textPrimary, height: 1.5)),
+            child: Text(message.content,
+                style: const TextStyle(
+                    fontSize: 14,
+                    color: WeaverColors.textPrimary,
+                    height: 1.5)),
           ),
         ),
         const SizedBox(width: 10),
         Container(
-          width: 32, height: 32,
+          width: 32,
+          height: 32,
           decoration: BoxDecoration(
             color: WeaverColors.accent,
             shape: BoxShape.circle,
           ),
-          child: const Center(child: Text('M', style: TextStyle(color: WeaverColors.background, fontWeight: FontWeight.bold, fontSize: 14))),
+          child: const Center(
+              child: Text('M',
+                  style: TextStyle(
+                      color: WeaverColors.background,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14))),
         ),
       ],
     );
@@ -454,23 +509,31 @@ class _AssistantBubble extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 32, height: 32,
+          width: 32,
+          height: 32,
           decoration: BoxDecoration(
             color: WeaverColors.accentGlow,
             shape: BoxShape.circle,
             border: Border.all(color: WeaverColors.accent.withOpacity(0.4)),
           ),
-          child: const Center(child: Text('W', style: TextStyle(color: WeaverColors.accent, fontWeight: FontWeight.bold, fontSize: 14))),
+          child: const Center(
+              child: Text('W',
+                  style: TextStyle(
+                      color: WeaverColors.accent,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14))),
         ),
         const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (message.toolCall != null) _ToolCallCard(toolCall: message.toolCall!),
+              if (message.toolCall != null)
+                _ToolCallCard(toolCall: message.toolCall!),
               if (message.toolCall != null) const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: WeaverColors.card,
                   borderRadius: const BorderRadius.only(
@@ -481,12 +544,13 @@ class _AssistantBubble extends StatelessWidget {
                   ),
                   border: Border.all(color: WeaverColors.cardBorder),
                 ),
-                child: _MarkdownText(text: message.content),
+                child: _AssistantMessageContent(text: message.content),
               ),
               const SizedBox(height: 4),
               Text(
                 _formatTime(message.timestamp),
-                style: const TextStyle(fontSize: 10, color: WeaverColors.textMuted),
+                style: const TextStyle(
+                    fontSize: 10, color: WeaverColors.textMuted),
               ),
             ],
           ),
@@ -513,7 +577,9 @@ class _ToolCallCard extends StatelessWidget {
         color: WeaverColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: toolCall.success ? WeaverColors.success.withOpacity(0.4) : WeaverColors.error.withOpacity(0.4),
+          color: toolCall.success
+              ? WeaverColors.success.withOpacity(0.4)
+              : WeaverColors.error.withOpacity(0.4),
         ),
       ),
       child: Row(
@@ -526,20 +592,27 @@ class _ToolCallCard extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             toolCall.toolName,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: WeaverColors.textSecondary, fontFamily: 'JetBrainsMono'),
+            style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: WeaverColors.textSecondary,
+                fontFamily: 'JetBrainsMono'),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               toolCall.result,
-              style: const TextStyle(fontSize: 11, color: WeaverColors.textMuted),
+              style:
+                  const TextStyle(fontSize: 11, color: WeaverColors.textMuted),
               overflow: TextOverflow.ellipsis,
             ),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: toolCall.success ? WeaverColors.successDim : WeaverColors.errorDim,
+              color: toolCall.success
+                  ? WeaverColors.successDim
+                  : WeaverColors.errorDim,
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
@@ -547,7 +620,9 @@ class _ToolCallCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 9,
                 fontWeight: FontWeight.w700,
-                color: toolCall.success ? WeaverColors.success : WeaverColors.error,
+                color: toolCall.success
+                    ? WeaverColors.success
+                    : WeaverColors.error,
               ),
             ),
           ),
@@ -557,31 +632,206 @@ class _ToolCallCard extends StatelessWidget {
   }
 }
 
-// Simple markdown-like text renderer
+class _AssistantMessageContent extends StatelessWidget {
+  final String text;
+  const _AssistantMessageContent({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final parsed = _ParsedAssistantBody.parse(text);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final think in parsed.thinkBlocks) ...[
+          _ThinkBlock(content: think),
+          const SizedBox(height: 10),
+        ],
+        for (final tool in parsed.toolBlocks) ...[
+          _InlineToolBlock(content: tool),
+          const SizedBox(height: 10),
+        ],
+        _MarkdownText(text: parsed.visibleMarkdown),
+      ],
+    );
+  }
+}
+
+class _ThinkBlock extends StatefulWidget {
+  final String content;
+  const _ThinkBlock({required this.content});
+
+  @override
+  State<_ThinkBlock> createState() => _ThinkBlockState();
+}
+
+class _ThinkBlockState extends State<_ThinkBlock> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: WeaverColors.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: WeaverColors.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(
+                    _expanded
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
+                    size: 16,
+                    color: WeaverColors.warning,
+                  ),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'Thinking',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: WeaverColors.warning,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_expanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: _MarkdownText(text: widget.content),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InlineToolBlock extends StatelessWidget {
+  final String content;
+  const _InlineToolBlock({required this.content});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: WeaverColors.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: WeaverColors.accent.withOpacity(0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Tool Output',
+            style: TextStyle(
+              fontSize: 11,
+              color: WeaverColors.accent,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.4,
+            ),
+          ),
+          const SizedBox(height: 6),
+          _MarkdownText(text: content),
+        ],
+      ),
+    );
+  }
+}
+
 class _MarkdownText extends StatelessWidget {
   final String text;
   const _MarkdownText({required this.text});
 
   @override
   Widget build(BuildContext context) {
-    final spans = <TextSpan>[];
-    final parts = text.split('\n');
-    for (var i = 0; i < parts.length; i++) {
-      final line = parts[i];
-      if (line.startsWith('**') && line.contains('**', 2)) {
-        // Rough bold handling
-        spans.add(TextSpan(
-          text: '${line.replaceAllMapped(RegExp(r'\*\*(.*?)\*\*'), (m) => m.group(1)!)}\n',
-          style: const TextStyle(color: WeaverColors.textPrimary, height: 1.6),
-        ));
-      } else {
-        spans.add(TextSpan(
-          text: i < parts.length - 1 ? '$line\n' : line,
-          style: const TextStyle(color: WeaverColors.textPrimary, height: 1.6),
-        ));
-      }
+    final cleaned = text.trim();
+    if (cleaned.isEmpty) {
+      return const SizedBox.shrink();
     }
-    return RichText(text: TextSpan(children: spans, style: const TextStyle(fontSize: 14, fontFamily: 'Inter')));
+    return MarkdownBody(
+      data: cleaned,
+      selectable: true,
+      styleSheet: MarkdownStyleSheet(
+        p: const TextStyle(
+          fontSize: 14,
+          color: WeaverColors.textPrimary,
+          height: 1.55,
+        ),
+        code: const TextStyle(
+          fontSize: 12,
+          color: WeaverColors.textPrimary,
+          fontFamily: 'JetBrainsMono',
+        ),
+        codeblockPadding: const EdgeInsets.all(10),
+        codeblockDecoration: BoxDecoration(
+          color: WeaverColors.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: WeaverColors.cardBorder),
+        ),
+        blockquote: const TextStyle(
+          color: WeaverColors.textSecondary,
+          fontStyle: FontStyle.italic,
+        ),
+      ),
+    );
+  }
+}
+
+class _ParsedAssistantBody {
+  final String visibleMarkdown;
+  final List<String> thinkBlocks;
+  final List<String> toolBlocks;
+
+  const _ParsedAssistantBody({
+    required this.visibleMarkdown,
+    required this.thinkBlocks,
+    required this.toolBlocks,
+  });
+
+  static _ParsedAssistantBody parse(String raw) {
+    var remaining = raw;
+    final thinkBlocks = <String>[];
+    final toolBlocks = <String>[];
+
+    final thinkRegex = RegExp(r'<think>([\s\S]*?)</think>', caseSensitive: false);
+    remaining = remaining.replaceAllMapped(thinkRegex, (m) {
+      final content = (m.group(1) ?? '').trim();
+      if (content.isNotEmpty) {
+        thinkBlocks.add(content);
+      }
+      return '';
+    });
+
+    final toolFenceRegex = RegExp(
+      r'```(?:tool|tools|tool_call|tool-result|tool_result)\s*\n([\s\S]*?)```',
+      caseSensitive: false,
+    );
+    remaining = remaining.replaceAllMapped(toolFenceRegex, (m) {
+      final content = (m.group(1) ?? '').trim();
+      if (content.isNotEmpty) {
+        toolBlocks.add(content);
+      }
+      return '';
+    });
+
+    return _ParsedAssistantBody(
+      visibleMarkdown: remaining.trim(),
+      thinkBlocks: thinkBlocks,
+      toolBlocks: toolBlocks,
+    );
   }
 }
 
@@ -625,7 +875,10 @@ class _ChatInputState extends State<_ChatInput> {
                   maxLines: null,
                   keyboardType: TextInputType.multiline,
                   textInputAction: TextInputAction.newline,
-                  style: const TextStyle(fontSize: 14, color: WeaverColors.textPrimary, height: 1.5),
+                  style: const TextStyle(
+                      fontSize: 14,
+                      color: WeaverColors.textPrimary,
+                      height: 1.5),
                   decoration: const InputDecoration(
                     hintText: 'Message Weaver... (Shift+Enter for new line)',
                     border: InputBorder.none,
@@ -645,39 +898,55 @@ class _ChatInputState extends State<_ChatInput> {
                   child: Row(
                     children: [
                       // Quick action buttons
-                      _InputAction(icon: Icons.attach_file_rounded, tooltip: 'Attach file'),
-                      _InputAction(icon: Icons.account_tree_rounded, tooltip: 'Create workflow', onTap: () {
-                        Provider.of<AppState>(context, listen: false).setRightPanelTab(1);
-                        Provider.of<WorkflowsProvider>(context, listen: false).toggleCreateDialog();
-                      }),
-                      _InputAction(icon: Icons.code_rounded, tooltip: 'Code mode'),
+                      _InputAction(
+                          icon: Icons.attach_file_rounded,
+                          tooltip: 'Attach file'),
+                      _InputAction(
+                          icon: Icons.account_tree_rounded,
+                          tooltip: 'Create workflow',
+                          onTap: () {
+                            Provider.of<AppState>(context, listen: false)
+                                .setRightPanelTab(1);
+                            Provider.of<WorkflowsProvider>(context,
+                                    listen: false)
+                                .toggleCreateDialog();
+                          }),
+                      _InputAction(
+                          icon: Icons.code_rounded, tooltip: 'Code mode'),
                       const Spacer(),
                       // Model indicator
                       Consumer<ModelProvider>(
                         builder: (ctx, modelProv, _) => Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: WeaverColors.surface,
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             modelProv.modelName,
-                            style: const TextStyle(fontSize: 11, color: WeaverColors.textMuted, fontWeight: FontWeight.w500),
+                            style: const TextStyle(
+                                fontSize: 11,
+                                color: WeaverColors.textMuted,
+                                fontWeight: FontWeight.w500),
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
                       // Send button
                       GestureDetector(
-                        onTap: () => chatProv.sendMessage(chatProv.inputController.text),
+                        onTap: () =>
+                            chatProv.sendMessage(chatProv.inputController.text),
                         child: Container(
-                          width: 32, height: 32,
+                          width: 32,
+                          height: 32,
                           decoration: BoxDecoration(
                             color: WeaverColors.accent,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: const Center(
-                            child: Icon(Icons.arrow_upward_rounded, color: WeaverColors.background, size: 16),
+                            child: Icon(Icons.arrow_upward_rounded,
+                                color: WeaverColors.background, size: 16),
                           ),
                         ),
                       ),
@@ -724,7 +993,11 @@ class _InputActionState extends State<_InputAction> {
               color: _hovered ? WeaverColors.cardHover : Colors.transparent,
               borderRadius: BorderRadius.circular(6),
             ),
-            child: Icon(widget.icon, size: 15, color: _hovered ? WeaverColors.textSecondary : WeaverColors.textMuted),
+            child: Icon(widget.icon,
+                size: 15,
+                color: _hovered
+                    ? WeaverColors.textSecondary
+                    : WeaverColors.textMuted),
           ),
         ),
       ),

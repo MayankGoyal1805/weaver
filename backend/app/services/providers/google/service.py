@@ -172,6 +172,23 @@ class GoogleIntegrationService:
             "verified_email": data.get("verified_email"),
         }
 
+    @staticmethod
+    async def get_gmail_profile(access_token: str) -> dict:
+        headers = {"Authorization": f"Bearer {access_token}"}
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.get(
+                "https://gmail.googleapis.com/gmail/v1/users/me/profile",
+                headers=headers,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+        return {
+            "email": data.get("emailAddress"),
+            "messages_total": data.get("messagesTotal"),
+            "threads_total": data.get("threadsTotal"),
+        }
+
 
 def _extract_message_body(payload: dict) -> str:
     plain_text = _find_plain_text(payload)

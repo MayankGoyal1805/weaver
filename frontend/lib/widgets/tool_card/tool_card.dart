@@ -430,8 +430,8 @@ class _DiscordChannelEditorState extends State<_DiscordChannelEditor> {
                       .read<BackendProvider>()
                       .setDiscordChannelId(_channelController.text),
                   icon: const Icon(Icons.save_rounded, size: 13),
-                  label:
-                      const Text('Save Default', style: TextStyle(fontSize: 11)),
+                  label: const Text('Save Default',
+                      style: TextStyle(fontSize: 11)),
                   style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 10)),
                 ),

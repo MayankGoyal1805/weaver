@@ -28,172 +28,126 @@ async def chat(payload: ChatIn) -> ChatOut:
 @router.post("/agent", response_model=AgentPromptOut)
 async def agent_prompt(payload: AgentPromptIn) -> AgentPromptOut:
     enabled = set(payload.enabled_tool_ids)
-    prompt_lower = payload.prompt.lower()
 
-    has_send_intent = any(x in prompt_lower for x in ["send", "post", "share", "forward", "publish", "notify"])
-    mentions_discord_target = any(
-        x in prompt_lower for x in ["discord", "channel", "server", "bot", "there", "that channel"]
-    )
+    def _is_tool_enabled(tool_id: str) -> bool:
+        if "gmail" in enabled and tool_id.startswith("google.gmail."):
+            return True
+        if "google-drive" in enabled and tool_id.startswith("google.drive."):
+            return True
+        if "discord" in enabled and tool_id.startswith("discord."):
+            return True
+        if "filesystem" in enabled and tool_id.startswith("filesystem."):
+            return True
+        return False
 
-    wants_latest_gmail = any(
-        x in prompt_lower
-        for x in [
-            "latest gmail",
-            "latest email",
-            "last gmail",
-            "last email",
-            "newest email",
-            "check gmail",
-            "read gmail",
-            "inbox",
-        ]
-    )
-    wants_drive_files = any(
-        x in prompt_lower
-        for x in [
-            "drive files",
-            "google drive",
-            "list drive",
-            "drive folder",
-            "show drive",
-            "browse drive",
-        ]
-    )
-    wants_discord = "discord" in enabled and (
-        any(x in prompt_lower for x in ["discord", "channel", "send to discord", "post to discord"])
-        or (has_send_intent and mentions_discord_target)
-        or (
-            has_send_intent
-            and payload.discord_channel_id
-            and any(x in prompt_lower for x in ["email", "gmail", "summary", "summarize", "latest"])
-        )
-    )
+    openai_tools = []
+    for t in tool_execution_service.catalog:
+        if _is_tool_enabled(t.tool_id):
+            # Special case: inject discord_channel_id if needed, but the model can just not provide it if we inject it later.
+            # Actually, the model needs to provide it, or we can intercept discord.send_message.
+            openai_tools.append({
+                "type": "function",
+                "function": {
+                    "name": t.tool_id.replace(".", "_"), # OpenAI doesn't allow periods in function names
+                    "description": t.description or t.display_name,
+                    "parameters": t.input_schema,
+                }
+            })
 
-    tool_calls: list[AgentToolCallOut] = []
-    latest_email: dict | None = None
-    drive_files: dict | None = None
-    gmail_error: str | None = None
+    # Create mapping back from OpenAI name to actual tool_id
+    tool_name_map = {t.tool_id.replace(".", "_"): t.tool_id for t in tool_execution_service.catalog}
 
-    if wants_latest_gmail and "gmail" in enabled:
-        out = await tool_execution_service.execute("google.gmail.get_latest_email", {})
-        tool_calls.append(AgentToolCallOut(tool_id="google.gmail.get_latest_email", result=out))
-        if out.get("status") == "ok":
-            latest_email = out.get("result")
-        else:
-            gmail_error = (
-                (out.get("result") or {}).get("payload", {}).get("error")
-                or str((out.get("result") or {}).get("payload") or "")
-                or "Unknown Gmail tool error"
-            )
+    system_prompt = payload.system_prompt or "You are Weaver, a helpful AI assistant."
+    if "discord" in enabled and payload.discord_channel_id:
+        system_prompt += f"\nIf asked to send to Discord without specifying a channel, use the default channel ID: {payload.discord_channel_id}."
 
-    if wants_drive_files and "google-drive" in enabled:
-        out = await tool_execution_service.execute("google.drive.list_files", {"page_size": 10})
-        tool_calls.append(AgentToolCallOut(tool_id="google.drive.list_files", result=out))
-        if out.get("status") == "ok":
-            drive_files = out.get("result")
+    history = list(payload.history)
+    current_prompt = payload.prompt
 
-    llm_system_prompt = payload.system_prompt
-    llm_prompt = payload.prompt
-    context_chunks: list[str] = []
-
-    if latest_email is not None:
-        context_chunks.append(_compact_email_context(latest_email))
-    if drive_files is not None:
-        context_chunks.append(_compact_drive_context(drive_files))
-
-    if context_chunks:
-        llm_prompt = payload.prompt + "\n\nTool results:\n" + "\n\n".join(context_chunks)
-
-    if wants_discord and payload.discord_channel_id and latest_email is not None:
-        llm_system_prompt = (
-            "Write a concise Discord notification under 900 characters. "
-            "Do not include code blocks, setup instructions, or policy text. "
-            "Use plain text with sender, subject, and short summary only."
-        )
-        llm_prompt = (
-            "Create a concise Discord message for this Gmail item. "
-            "Return message text only.\n\n"
-            f"{_compact_email_context(latest_email)}"
-        )
-
+    all_tool_calls_out: list[AgentToolCallOut] = []
     chat_out: ChatOut | None = None
     chat_error: str | None = None
+    accumulated_content: list[str] = []
+    
+    from app.schemas.chat import AgentBlockOut
+    agent_blocks: list[AgentBlockOut] = []
 
-    if wants_latest_gmail and latest_email is None and gmail_error is not None:
-        if "401" in gmail_error or "unauthorized" in gmail_error.lower():
-            chat_error = (
-                "Gmail access failed (401 Unauthorized). Please reconnect Google in Settings and try again."
+    import json
+
+    for iteration in range(5): # Max 5 iterations
+        try:
+            out = await llm_service.chat(
+                prompt=current_prompt if iteration == 0 else "",
+                system_prompt=system_prompt,
+                model_name=payload.model_name,
+                llm_api_key=payload.llm_api_key,
+                llm_base_url=payload.llm_base_url,
+                history=history,
+                tools=openai_tools if openai_tools else None,
             )
-        else:
-            chat_error = f"Gmail fetch failed: {gmail_error}"
+        except LLMConfigError as exc:
+            chat_error = str(exc)
+            break
+        except Exception as exc:
+            chat_error = f"LLM request failed: {exc}"
+            break
 
-        chat_out = ChatOut(
-            model_name=payload.model_name or "agent",
-            content=chat_error,
-            raw_response={"reason": "gmail_fetch_failed"},
-        )
-        return AgentPromptOut(
-            chat=chat_out,
-            chat_error=chat_error,
-            tool_calls=tool_calls,
-            discord_send=None,
-        )
-
-    if has_send_intent and "discord" in enabled and not payload.discord_channel_id:
-        chat_error = "Discord send was requested, but no default Discord channel id is configured in Settings."
-        chat_out = ChatOut(
-            model_name=payload.model_name or "agent",
-            content=(
-                "Discord send is enabled, but no default channel ID is configured. "
-                "Open Settings -> Agent Defaults -> Default Discord Channel ID, save it, then try again."
-            ),
-            raw_response={"reason": "missing_discord_channel_id"},
-        )
-        return AgentPromptOut(
-            chat=chat_out,
-            chat_error=chat_error,
-            tool_calls=tool_calls,
-            discord_send=None,
-        )
-
-    try:
-        out = await llm_service.chat(
-            prompt=llm_prompt,
-            system_prompt=llm_system_prompt,
-            model_name=payload.model_name,
-            llm_api_key=payload.llm_api_key,
-            llm_base_url=payload.llm_base_url,
-            history=payload.history,
-        )
         chat_out = ChatOut(**out)
-    except LLMConfigError as exc:
-        chat_error = str(exc)
-    except Exception as exc:
-        chat_error = f"LLM request failed: {exc}"
+        if chat_out.content:
+            accumulated_content.append(chat_out.content)
+            agent_blocks.append(AgentBlockOut(block_type="text", text=chat_out.content))
+        
+        # Add the assistant's message to history
+        assistant_msg = {"role": "assistant", "content": chat_out.content or ""}
+        if chat_out.tool_calls:
+            assistant_msg["tool_calls"] = chat_out.tool_calls
+        history.append(assistant_msg)
 
-    discord_send: dict | None = None
-    can_send_discord = wants_discord and payload.discord_channel_id and "discord" in enabled
-    if wants_latest_gmail and latest_email is None:
-        can_send_discord = False
+        if not chat_out.tool_calls:
+            break # No more tools to call, we are done!
 
-    if can_send_discord:
-        content = (chat_out.content if chat_out else "").strip()
-        if not content and latest_email:
-            content = _format_email_fallback(latest_email)
-        if content:
-            content = _discord_safe_content(content)
-            send_out = await tool_execution_service.execute(
-                "discord.send_message",
-                {"channel_id": payload.discord_channel_id, "content": content},
+        # Execute tool calls
+        for tc in chat_out.tool_calls:
+            function_call = tc.get("function", {})
+            func_name_openai = function_call.get("name")
+            arguments_str = function_call.get("arguments", "{}")
+            
+            try:
+                arguments = json.loads(arguments_str)
+            except json.JSONDecodeError:
+                arguments = {}
+
+            real_tool_id = tool_name_map.get(func_name_openai)
+            if not real_tool_id:
+                result = {"status": "error", "error": f"Unknown tool {func_name_openai}"}
+            else:
+                result = await tool_execution_service.execute(real_tool_id, arguments)
+            
+            tc_out = AgentToolCallOut(
+                tool_id=real_tool_id or func_name_openai, 
+                arguments=arguments,
+                result=result
             )
-            tool_calls.append(AgentToolCallOut(tool_id="discord.send_message", result=send_out))
-            discord_send = send_out
+            all_tool_calls_out.append(tc_out)
+            agent_blocks.append(AgentBlockOut(block_type="tool_call", tool_call=tc_out))
+            
+            # Append tool result to history
+            history.append({
+                "role": "tool",
+                "tool_call_id": tc.get("id"),
+                "name": func_name_openai,
+                "content": json.dumps(result)
+            })
+
+    if chat_out and accumulated_content:
+        chat_out.content = "\n\n".join(accumulated_content)
 
     return AgentPromptOut(
         chat=chat_out,
         chat_error=chat_error,
-        tool_calls=tool_calls,
-        discord_send=discord_send,
+        tool_calls=all_tool_calls_out,
+        discord_send=None,
+        blocks=agent_blocks,
     )
 
 

@@ -19,6 +19,7 @@ class LLMService:
         llm_api_key: str | None = None,
         llm_base_url: str | None = None,
         history: list[dict] | None = None,
+        tools: list[dict] | None = None,
     ) -> dict:
         settings = get_settings()
         api_key = (llm_api_key or settings.llm_api_key).strip()
@@ -47,6 +48,9 @@ class LLMService:
             "messages": messages,
             "temperature": 0.2,
         }
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(endpoint, headers=headers, json=payload)
@@ -55,14 +59,19 @@ class LLMService:
 
         choices = data.get("choices", [])
         message = choices[0].get("message", {}) if choices else {}
-        content = message.get("content", "")
+        content = message.get("content", "") or ""
+        reasoning = message.get("reasoning_content") or message.get("reasoning") or ""
+        tool_calls = message.get("tool_calls", [])
+        
+        if reasoning:
+            content = f"<think>\n{reasoning}\n</think>\n\n{content}".strip()
 
         return {
             "model_name": chosen_model,
             "content": content,
             "raw_response": data,
+            "tool_calls": tool_calls,
         }
-
 
 llm_service = LLMService()
 
@@ -84,15 +93,24 @@ def _build_bounded_messages(prompt: str, system_prompt: str | None, history: lis
     for item in history[-_MAX_HISTORY_MESSAGES:]:
         role = item.get("role", "user")
         content = item.get("content", "")
-        if role not in {"user", "assistant", "system"}:
+        if role not in {"user", "assistant", "system", "tool"}:
             continue
-        if not content:
+        
+        if not content and not item.get("tool_calls"):
             continue
-        text = _strip_think(content)
+            
+        text = _strip_think(content) if content else ""
         text = _trim_text(text, _MAX_SINGLE_MESSAGE_CHARS)
-        if not text:
-            continue
-        cleaned_history.append({"role": role, "content": text})
+        
+        msg = {"role": role, "content": text}
+        if item.get("tool_calls"):
+            msg["tool_calls"] = item.get("tool_calls")
+        if item.get("tool_call_id"):
+            msg["tool_call_id"] = item.get("tool_call_id")
+        if item.get("name"):
+            msg["name"] = item.get("name")
+            
+        cleaned_history.append(msg)
 
     prompt_text = _trim_text(_strip_think(prompt), _MAX_PROMPT_CHARS)
     bounded.extend(cleaned_history)

@@ -58,12 +58,28 @@ class ToolCallResult {
   });
 }
 
+/// A single rendered "block" inside one agent response turn.
+/// Each turn produces an ordered list of these: thinking text, tool calls,
+/// more text, and so on — all inside the same chat bubble.
+sealed class AgentBlock {}
+
+class TextBlock extends AgentBlock {
+  final String text;
+  TextBlock(this.text);
+}
+
+class ToolCallBlock extends AgentBlock {
+  final ToolCallResult toolCall;
+  ToolCallBlock(this.toolCall);
+}
+
 class ChatMessage {
   final String id;
   final MessageRole role;
-  final String content;
+  final String content;       // kept for user messages & legacy serialisation
   final DateTime timestamp;
-  final ToolCallResult? toolCall;
+  final ToolCallResult? toolCall;  // kept for legacy serialisation
+  final List<AgentBlock> blocks;   // ordered blocks for agent turns
   final bool isStreaming;
 
   const ChatMessage({
@@ -72,9 +88,11 @@ class ChatMessage {
     required this.content,
     required this.timestamp,
     this.toolCall,
+    this.blocks = const [],
     this.isStreaming = false,
   });
 }
+
 
 class ChatSession {
   final String id;

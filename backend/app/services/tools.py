@@ -214,6 +214,8 @@ async def _discord_send_message(arguments: dict[str, Any]) -> dict[str, Any]:
     )
 
 
+from datetime import UTC, datetime
+
 async def _resolve_google_access_token(arguments: dict[str, Any]) -> str:
     provided = arguments.get("access_token", "")
     if provided:
@@ -225,11 +227,26 @@ async def _resolve_google_access_token(arguments: dict[str, Any]) -> str:
 
     access_token = stored.get("access_token", "")
     refresh_token = stored.get("refresh_token", "")
+    expires_at_str = stored.get("expires_at")
 
-    if access_token:
+    is_expired = False
+    if expires_at_str:
+        try:
+            # Handle ISO format with Z or +00:00
+            if expires_at_str.endswith("Z"):
+                expires_at_str = expires_at_str[:-1] + "+00:00"
+            expires_at = datetime.fromisoformat(expires_at_str)
+            if datetime.now(UTC) >= expires_at:
+                is_expired = True
+        except ValueError:
+            is_expired = True
+
+    if access_token and not is_expired:
         return access_token
 
     if not refresh_token:
+        if access_token:
+            return access_token # fallback if we can't refresh
         raise RuntimeError("Google auth has no usable token. Re-run auth-google.")
 
     refreshed = await google_service.refresh_access_token(refresh_token)

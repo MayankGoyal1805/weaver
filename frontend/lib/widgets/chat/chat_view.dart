@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../providers/providers.dart';
 import '../../theme/colors.dart';
 import '../../models/models.dart';
+import 'dart:convert';
+
 import '../common/animated_widgets.dart';
 
 class ChatView extends StatelessWidget {
@@ -472,7 +475,7 @@ class _UserBubble extends StatelessWidget {
               ),
               border: Border.all(color: WeaverColors.accent.withOpacity(0.3)),
             ),
-            child: Text(message.content,
+            child: SelectableText(message.content,
                 style: const TextStyle(
                     fontSize: 14,
                     color: WeaverColors.textPrimary,
@@ -528,12 +531,8 @@ class _AssistantBubble extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (message.toolCall != null)
-                _ToolCallCard(toolCall: message.toolCall!),
-              if (message.toolCall != null) const SizedBox(height: 8),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: WeaverColors.card,
                   borderRadius: const BorderRadius.only(
@@ -544,7 +543,7 @@ class _AssistantBubble extends StatelessWidget {
                   ),
                   border: Border.all(color: WeaverColors.cardBorder),
                 ),
-                child: _AssistantMessageContent(text: message.content),
+                child: _buildBlockList(message),
               ),
               const SizedBox(height: 4),
               Text(
@@ -559,73 +558,157 @@ class _AssistantBubble extends StatelessWidget {
     );
   }
 
+  Widget _buildBlockList(ChatMessage message) {
+    // New: ordered blocks list
+    if (message.blocks.isNotEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: message.blocks.map<Widget>((block) {
+          if (block is ToolCallBlock) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _ToolCallCard(toolCall: block.toolCall),
+            );
+          } else if (block is TextBlock && block.text.isNotEmpty) {
+            return Padding(
+              padding: EdgeInsets.only(
+                // Add top padding if there was a tool call before this
+                top: message.blocks.indexOf(block) > 0 ? 4 : 0,
+              ),
+              child: _AssistantMessageContent(text: block.text),
+            );
+          }
+          return const SizedBox.shrink();
+        }).toList(),
+      );
+    }
+    // Legacy fallback: single toolCall + content
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (message.toolCall != null) ...[
+          _ToolCallCard(toolCall: message.toolCall!),
+          const SizedBox(height: 8),
+        ],
+        if (message.content.isNotEmpty)
+          _AssistantMessageContent(text: message.content),
+      ],
+    );
+  }
+
   String _formatTime(DateTime dt) {
     return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 }
 
-class _ToolCallCard extends StatelessWidget {
+
+class _ToolCallCard extends StatefulWidget {
   final ToolCallResult toolCall;
   const _ToolCallCard({required this.toolCall});
 
   @override
+  State<_ToolCallCard> createState() => _ToolCallCardState();
+}
+
+class _ToolCallCardState extends State<_ToolCallCard> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
+    final argsString = widget.toolCall.arguments.isEmpty 
+        ? '{}' 
+        : jsonEncode(widget.toolCall.arguments);
+        
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      margin: const EdgeInsets.only(bottom: 4),
+      margin: const EdgeInsets.only(bottom: 6),
       decoration: BoxDecoration(
         color: WeaverColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: toolCall.success
+          color: widget.toolCall.success
               ? WeaverColors.success.withOpacity(0.4)
               : WeaverColors.error.withOpacity(0.4),
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            toolCall.success ? Icons.bolt_rounded : Icons.error_outline_rounded,
-            size: 14,
-            color: toolCall.success ? WeaverColors.success : WeaverColors.error,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            toolCall.toolName,
-            style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: WeaverColors.textSecondary,
-                fontFamily: 'JetBrainsMono'),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              toolCall.result,
-              style:
-                  const TextStyle(fontSize: 11, color: WeaverColors.textMuted),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: toolCall.success
-                  ? WeaverColors.successDim
-                  : WeaverColors.errorDim,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              toolCall.success ? 'OK' : 'ERR',
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                color: toolCall.success
-                    ? WeaverColors.success
-                    : WeaverColors.error,
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  Icon(
+                    _expanded ? Icons.expand_more_rounded : Icons.chevron_right_rounded,
+                    size: 16,
+                    color: WeaverColors.textMuted,
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    widget.toolCall.success ? Icons.bolt_rounded : Icons.error_outline_rounded,
+                    size: 14,
+                    color: widget.toolCall.success ? WeaverColors.success : WeaverColors.error,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    widget.toolCall.toolName,
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: WeaverColors.textSecondary,
+                        fontFamily: 'JetBrainsMono'),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      argsString,
+                      style: const TextStyle(fontSize: 11, color: WeaverColors.textMuted, fontFamily: 'JetBrainsMono'),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: widget.toolCall.success
+                          ? WeaverColors.successDim
+                          : WeaverColors.errorDim,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      widget.toolCall.success ? 'OK' : 'ERR',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: widget.toolCall.success
+                            ? WeaverColors.success
+                            : WeaverColors.error,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
+          if (_expanded)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: WeaverColors.cardBorder)),
+                color: WeaverColors.card.withOpacity(0.5),
+              ),
+              child: SelectableText(
+                widget.toolCall.result,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: WeaverColors.textSecondary,
+                  fontFamily: 'JetBrainsMono',
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -844,7 +927,30 @@ class _ChatInput extends StatefulWidget {
 }
 
 class _ChatInputState extends State<_ChatInput> {
-  final _focusNode = FocusNode();
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode(
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.enter) {
+          final isShift = HardwareKeyboard.instance.isShiftPressed;
+          final isCtrl = HardwareKeyboard.instance.isControlPressed;
+          if (isShift || isCtrl) {
+            return KeyEventResult.ignored; // allow new line
+          } else {
+            final chatProv = Provider.of<ChatProvider>(context, listen: false);
+            if (chatProv.inputController.text.trim().isNotEmpty) {
+              chatProv.sendMessage(chatProv.inputController.text);
+            }
+            return KeyEventResult.handled; // prevent new line
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+    );
+  }
 
   @override
   void dispose() {
@@ -888,10 +994,6 @@ class _ChatInputState extends State<_ChatInput> {
                     fillColor: Colors.transparent,
                     filled: false,
                   ),
-                  onSubmitted: (val) {
-                    chatProv.sendMessage(val);
-                    _focusNode.requestFocus();
-                  },
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),

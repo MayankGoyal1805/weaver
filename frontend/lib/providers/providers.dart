@@ -78,6 +78,7 @@ class BackendProvider extends ChangeNotifier {
   String? get lastError => _lastError;
 
   Future<void> initialize() async {
+    await Future.microtask(() {});
     _baseUrl = await _prefs.loadBaseUrl();
     _discordChannelId = await _prefs.loadDiscordChannelId();
     _llmApiKey = await _prefs.loadLlmApiKey();
@@ -410,43 +411,62 @@ class ChatProvider extends ChangeNotifier {
         history: _historyForBackend(_messagesForSession(sessionId)),
       );
 
-      final toolCalls = (out['tool_calls'] as List<dynamic>? ?? const [])
-          .cast<Map<String, dynamic>>();
-      for (final toolCall in toolCalls) {
-        final result =
-            (toolCall['result'] as Map<String, dynamic>? ?? const {});
-        final status = result['status']?.toString() ?? 'unknown';
-        final summary = result['result']?.toString() ?? status;
+      final backendBlocks = (out['blocks'] as List<dynamic>? ?? const []);
+      final blocks = <AgentBlock>[];
 
-        final toolMsg = ChatMessage(
-          id: _newMessageId('t'),
-          role: MessageRole.assistant,
-          content: '',
-          timestamp: DateTime.now(),
-          toolCall: ToolCallResult(
+      for (final b in backendBlocks) {
+        final bMap = b as Map<String, dynamic>;
+        if (bMap['block_type'] == 'text') {
+          final text = bMap['text']?.toString() ?? '';
+          if (text.trim().isNotEmpty) {
+            blocks.add(TextBlock(text));
+          }
+        } else if (bMap['block_type'] == 'tool_call') {
+          final toolCall = bMap['tool_call'] as Map<String, dynamic>? ?? const {};
+          final result = (toolCall['result'] as Map<String, dynamic>? ?? const {});
+          final status = result['status']?.toString() ?? 'unknown';
+
+          String summary;
+          try {
+            final outputToFormat = Map<String, dynamic>.from(result)..remove('status');
+            summary = outputToFormat.isNotEmpty
+                ? const JsonEncoder.withIndent('  ').convert(outputToFormat)
+                : status;
+          } catch (_) {
+            summary = result.toString();
+          }
+
+          blocks.add(ToolCallBlock(ToolCallResult(
             toolName: toolCall['tool_id']?.toString() ?? 'tool',
-            arguments: const {},
+            arguments: (toolCall['arguments'] as Map<String, dynamic>? ?? const {}),
             result: summary,
             success: status == 'ok',
-          ),
-        );
-        _appendMessageBySession(sessionId, toolMsg);
+          )));
+        }
       }
 
-      final chat = (out['chat'] as Map<String, dynamic>? ?? const {});
       final chatError = out['chat_error']?.toString();
-      final assistantContent =
-          (chat['content']?.toString().trim().isNotEmpty ?? false)
-              ? chat['content'].toString()
-              : (chatError != null && chatError.isNotEmpty
-                  ? 'Agent note: $chatError'
-                  : 'Request completed.');
+      if (chatError != null && chatError.isNotEmpty) {
+        blocks.add(TextBlock('Agent note: $chatError'));
+      } else if (blocks.isEmpty) {
+        blocks.add(TextBlock('Request completed.'));
+      }
 
+      // Reconstruct content for legacy fallback or UI components that check message.content
+      final contentBuffer = StringBuffer();
+      for (final b in blocks) {
+        if (b is TextBlock) {
+          contentBuffer.writeln(b.text);
+        }
+      }
+
+      // Final unified assistant message with blocks
       final assistantMsg = ChatMessage(
         id: _newMessageId('a'),
         role: MessageRole.assistant,
-        content: assistantContent,
+        content: contentBuffer.toString().trim(),
         timestamp: DateTime.now(),
+        blocks: blocks,
       );
       _appendMessageBySession(sessionId, assistantMsg);
       _refreshSessionTitleById(sessionId);
@@ -456,6 +476,7 @@ class ChatProvider extends ChangeNotifier {
         role: MessageRole.assistant,
         content: 'Failed to process request: $exc',
         timestamp: DateTime.now(),
+        blocks: [TextBlock('Failed to process request: $exc')],
       );
       _appendMessageBySession(sessionId, assistantMsg);
     } finally {
@@ -664,11 +685,27 @@ class ChatProvider extends ChangeNotifier {
   }
 
   Map<String, dynamic> _messageToJson(ChatMessage msg) {
+    List<Map<String, dynamic>> blocksJson = msg.blocks.map((b) {
+      if (b is TextBlock) return {'type': 'text', 'text': b.text};
+      if (b is ToolCallBlock) {
+        return {
+          'type': 'tool_call',
+          'toolName': b.toolCall.toolName,
+          'arguments': b.toolCall.arguments,
+          'result': b.toolCall.result,
+          'success': b.toolCall.success,
+        };
+      }
+      return <String, dynamic>{};
+    }).where((m) => m.isNotEmpty).toList();
+
     return {
       'id': msg.id,
       'role': msg.role.name,
       'content': msg.content,
       'timestamp': msg.timestamp.toIso8601String(),
+      'blocks': blocksJson,
+      // legacy field kept for forward-compat reading
       'toolCall': msg.toolCall == null
           ? null
           : {
@@ -681,29 +718,51 @@ class ChatProvider extends ChangeNotifier {
   }
 
   ChatMessage _messageFromJson(Map<String, dynamic> data) {
-    final toolCallRaw = data['toolCall'];
-    ToolCallResult? toolCall;
-    if (toolCallRaw is Map<String, dynamic>) {
-      toolCall = ToolCallResult(
-        toolName: toolCallRaw['toolName']?.toString() ?? 'tool',
-        arguments:
-            (toolCallRaw['arguments'] as Map<String, dynamic>? ?? const {}),
-        result: toolCallRaw['result']?.toString() ?? '',
-        success: toolCallRaw['success'] == true,
-      );
-    }
     final roleName = data['role']?.toString() ?? 'assistant';
     final role = MessageRole.values.firstWhere(
       (e) => e.name == roleName,
       orElse: () => MessageRole.assistant,
     );
+
+    // Deserialise blocks list (new format)
+    final rawBlocks = data['blocks'] as List<dynamic>?;
+    List<AgentBlock> blocks = [];
+    if (rawBlocks != null && rawBlocks.isNotEmpty) {
+      for (final rb in rawBlocks) {
+        final bm = rb as Map<String, dynamic>;
+        if (bm['type'] == 'text') {
+          blocks.add(TextBlock(bm['text']?.toString() ?? ''));
+        } else if (bm['type'] == 'tool_call') {
+          blocks.add(ToolCallBlock(ToolCallResult(
+            toolName: bm['toolName']?.toString() ?? 'tool',
+            arguments: (bm['arguments'] as Map<String, dynamic>? ?? const {}),
+            result: bm['result']?.toString() ?? '',
+            success: bm['success'] == true,
+          )));
+        }
+      }
+    } else {
+      // Legacy: single toolCall field → convert to blocks
+      final toolCallRaw = data['toolCall'];
+      if (toolCallRaw is Map<String, dynamic>) {
+        blocks.add(ToolCallBlock(ToolCallResult(
+          toolName: toolCallRaw['toolName']?.toString() ?? 'tool',
+          arguments: (toolCallRaw['arguments'] as Map<String, dynamic>? ?? const {}),
+          result: toolCallRaw['result']?.toString() ?? '',
+          success: toolCallRaw['success'] == true,
+        )));
+      }
+      final content = data['content']?.toString() ?? '';
+      if (content.isNotEmpty) blocks.add(TextBlock(content));
+    }
+
     return ChatMessage(
       id: data['id']?.toString() ?? _newMessageId('m'),
       role: role,
       content: data['content']?.toString() ?? '',
       timestamp: DateTime.tryParse(data['timestamp']?.toString() ?? '') ??
           DateTime.now(),
-      toolCall: toolCall,
+      blocks: blocks,
     );
   }
 
@@ -1168,6 +1227,7 @@ class ModelProvider extends ChangeNotifier {
   int get maxTokens => _maxTokens;
 
   Future<void> initialize() async {
+    await Future.microtask(() {});
     if (_didLoad) return;
     _didLoad = true;
     _modelName = await _prefs.loadModelName();

@@ -9,8 +9,9 @@ class ChatIn(BaseModel):
 
 class ChatOut(BaseModel):
     model_name: str
-    content: str
+    content: str | None = None
     raw_response: dict
+    tool_calls: list[dict] = []
 
 
 class AgentPromptIn(BaseModel):
@@ -26,7 +27,14 @@ class AgentPromptIn(BaseModel):
 
 class AgentToolCallOut(BaseModel):
     tool_id: str
+    arguments: dict
     result: dict
+
+
+class AgentBlockOut(BaseModel):
+    block_type: str # "text" or "tool_call"
+    text: str | None = None
+    tool_call: AgentToolCallOut | None = None
 
 
 class AgentPromptOut(BaseModel):
@@ -34,3 +42,4 @@ class AgentPromptOut(BaseModel):
     chat_error: str | None = None
     tool_calls: list[AgentToolCallOut]
     discord_send: dict | None = None
+    blocks: list[AgentBlockOut] = []

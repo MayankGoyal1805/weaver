@@ -87,3 +87,4 @@ build/
 .classpath
 .settings/
 *.launch
+docs/

@@ -121,7 +121,7 @@ class BackendRuntime {
     final candidates = <Directory>[
       Directory('${cwd.path}/../backend'),
       Directory('${cwd.path}/backend'),
-      Directory('/home/mayank/repos/weaver/backend'),
+      Directory(cwd.path),
     ];
 
     for (final dir in candidates) {

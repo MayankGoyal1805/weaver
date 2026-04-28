@@ -53,8 +53,17 @@ Open `.env` in your editor and fill in the following:
 | Variable | Description | Importance |
 | :--- | :--- | :--- |
 | `OPENAI_API_KEY` | Your primary LLM key. | **Required** |
-| `DATABASE_URL` | Defaults to `sqlite+aiosqlite:///weaver.db`. | Optional change |
+| `DATABASE_URL` | Defaults to `sqlite+aiosqlite:///./weaver.db`. **No external DB is needed**; it automatically creates a local file. | Optional change |
 | `LOG_LEVEL` | Set to `INFO` or `DEBUG`. | For troubleshooting |
+
+### Step 2.2a: Initialize the Database (Alembic)
+Weaver uses Alembic to manage database schema updates. Before running the app for the first time, you must run the database migrations to create the required tables in your local SQLite database (defined by `DATABASE_URL`).
+
+```bash
+uv run alembic upgrade head
+```
+- **What happens?**: Alembic reads the current configuration, connects to `sqlite+aiosqlite:///./weaver.db` (by default), and creates all necessary tables for users, runs, chats, and tools.
+- **Note**: You might notice `sqlalchemy.url = postgresql+asyncpg://...` in `alembic.ini`. **You can ignore this.** The migration environment (`app/db/migrations/env.py`) automatically overrides this hardcoded value with the `DATABASE_URL` from your `.env` file. You do not need to configure PostgreSQL to run this locally.
 
 ### Step 2.3: Run the Development Server
 ```bash
